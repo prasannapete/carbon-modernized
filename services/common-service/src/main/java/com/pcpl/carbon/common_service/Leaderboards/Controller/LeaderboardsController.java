@@ -36,7 +36,7 @@ public class LeaderboardsController extends AbstractCRUDController<Leaderboards,
         logger.trace("Entering");
         ApplicationResponse applicationResponse = ApplicationResponse.builder().build();
         try {
-            applicationResponse = leaderboardService.get(formData.get("StatisticName"), Integer.parseInt(formData.get("StartPosition")));
+            applicationResponse = leaderboardService.get(formData.get("statisticName"), Integer.parseInt(formData.get("startPosition")));
             applicationResponse.setSuccess(true);
             applicationResponse.setError("");
         } catch (Exception ex) {

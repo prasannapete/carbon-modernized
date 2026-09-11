@@ -1,5 +1,6 @@
 package com.pcpl.carbon.pcplsdk.Leaderboards.DTO;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,9 +9,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LeaderboardsDTO {
-    private long Id;
+    private Long id;
     private String leaderboardName;
     private String leaderboardInternalName;
+    private String leaderboardId;
     private int isActive;
     private Long tenantId;
 
