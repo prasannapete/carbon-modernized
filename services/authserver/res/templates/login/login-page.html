@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carbon :: Login</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" type="text/css">
+    <link rel="stylesheet" th:href="@{/library/bootstrap-5.3.3/css/bootstrap.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+<div class="login-page-section">
+    <div class="cb-section-container">
+        <div>
+            <img class="login-img-section" th:src="@{/images/icons/carbon-logo.png}">
+        </div>
+        <h2 class="login-heading-text">Sign In</h2>
+        <form id="form" th:action="@{/login}" method="post">
+            <div class="form-group" th:if="${showError}">
+                <div class="field-validation-error" th:text="${errorMsg}"></div>
+            </div>
+            <div class="login-section-group form-group form-primary">
+                <label class="login-label-section" for="userName"></label>
+                <input type="text" id="username" name="username"
+                       class="form-control input-form-control new-login-input-fields"
+                       required="" placeholder="User Name" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="login-label-section" for="password"></label>
+                <div class="input-group">
+                    <input id="password" type="password"
+                           name="password" class="form-control input-form-control new-login-input-fields"
+                           required="" placeholder="Password" autocomplete="off">
+                    <span class="input-group-addon toggle-password-field" id="toggle-change-password">
+                             <span class="fa fa-fw fa-eye-slash field_icon toggle-password"></span>
+                    </span>
+                </div>
+            </div>
+
+<!--            <div class="form-group-forgot text-center">-->
+<!--                <a href="/forgot-password-screen" class="btn btn"><u class="forgot">Forgot Password?</u></a>-->
+<!--            </div>-->
+
+            <button type="submit" class="btn btn-success btn-block">Login</button>
+
+        </form>
+    </div>
+</div>
+
+<script th:src="@{/library/bootstrap-5.3.3/js/bootstrap.bundle.js}"></script>
+<script th:src="@{/library/jquery/jquery-3.6.3.js}"></script>
+<script th:src="@{/library/jquery-validation/js/jquery.validate.js}"></script>
+<script th:src="@{/js/login.js}"></script>
+
+</body>
+</html>

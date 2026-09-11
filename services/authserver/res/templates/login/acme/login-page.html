@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acme :: Sign In</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" type="text/css">
+    <link rel="stylesheet" th:href="@{/library/bootstrap-5.3.3/css/bootstrap.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Tenant-specific look & feel - Acme */
+        body { background: #0b3d91; }
+        .acme-login-card {
+            max-width: 420px;
+            margin: 8vh auto;
+            padding: 40px 32px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+        }
+        .acme-brand { text-align: center; color: #0b3d91; font-weight: 700; letter-spacing: 2px; }
+        .acme-login-card .btn { background: #0b3d91; border-color: #0b3d91; }
+    </style>
+</head>
+<body>
+<div class="acme-login-card">
+    <h1 class="acme-brand">ACME CORP</h1>
+    <h2 class="login-heading-text text-center">Welcome back</h2>
+    <form id="form" th:action="@{/login}" method="post">
+        <div class="form-group" th:if="${showError}">
+            <div class="field-validation-error" th:text="${errorMsg}"></div>
+        </div>
+        <div class="login-section-group form-group form-primary">
+            <label class="login-label-section" for="username"></label>
+            <input type="text" id="username" name="username"
+                   class="form-control input-form-control new-login-input-fields"
+                   required="" placeholder="User Name" autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label class="login-label-section" for="password"></label>
+            <div class="input-group">
+                <input id="password" type="password"
+                       name="password" class="form-control input-form-control new-login-input-fields"
+                       required="" placeholder="Password" autocomplete="off">
+                <span class="input-group-addon toggle-password-field" id="toggle-change-password">
+                         <span class="fa fa-fw fa-eye-slash field_icon toggle-password"></span>
+                </span>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success btn-block w-100 mt-3">Login</button>
+    </form>
+</div>
+
+<script th:src="@{/library/bootstrap-5.3.3/js/bootstrap.bundle.js}"></script>
+<script th:src="@{/library/jquery/jquery-3.6.3.js}"></script>
+<script th:src="@{/library/jquery-validation/js/jquery.validate.js}"></script>
+<script th:src="@{/js/login.js}"></script>
+
+</body>
+</html>

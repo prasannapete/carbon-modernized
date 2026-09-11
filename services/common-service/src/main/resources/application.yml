@@ -1,0 +1,51 @@
+server:
+  port: 9202
+  forward-headers-strategy: NATIVE
+  servlet:
+    session:
+      cookie:
+        name: ${AUTH_SESSION_NAME:SRLSESSION}
+spring:
+  config:
+    # Load the project-root .env (kept out of git) as a property source so ${DB_PASSWORD}
+    # etc. resolve. Both paths are optional: ./ when run from the repo root (IntelliJ),
+    # ../../ when run from this module dir (mvn spring-boot:run).
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true&useSSL=false
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+      database-platform: org.hibernate.dialect.PostgreSQLDialect
+      database: postgresql
+    sendgrid:
+        api-key: ${SENDGRID_API_KEY}
+  application:
+    name: carbon-common-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWK_SET_URI:http://localhost:9201/oauth2/jwks}
+com:
+  pcpl:
+    carbon:
+      appBaseUrl: ${SRL_HOME_URL:https://sl-dev.prapticonsulting.com}
+      playFabURL: https://18B72.playfabapi.com/Client
+
+
+
+
+
+
+
+
+
+

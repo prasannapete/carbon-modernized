@@ -1,0 +1,4 @@
+/library/jars/
+/maintenance/db-patcher/changelog.xml
+/.idea/vcs.xml
+.env

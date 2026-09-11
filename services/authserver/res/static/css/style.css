@@ -1,0 +1,121 @@
+/*******************************LOGIN CSS *******************************/
+
+.login-page-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-color: rgb(20, 29, 61);
+}
+
+.cb-section-container {
+    width: 100%;
+    max-width: 634px;
+    padding: 15px;
+    margin: auto;
+    background-color: transparent;box-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+    border-radius: 5px;
+}
+
+form {
+    margin-top: 3%;
+    line-height: 2;
+}
+
+.login-img-section {
+    width: 25%;
+    height: 25%;
+    margin-left: 37%;
+    margin-top: 20px;
+}
+
+.login-section-group {
+    width: 90%;
+    margin-left: 30px;
+}
+
+.form-group {
+    width: 90%;
+    margin-left: 30px;
+}
+
+.form-group-forgot{
+    width: 90%;
+    margin-left: 35%;
+}
+.forgot{
+    color:white;
+}
+
+.sl-login-section {
+    width: 50%;
+    margin-left: 26%;
+    margin-bottom: 10px;
+}
+
+label {
+    color: #4B4B4B;
+}
+
+button.btn.btn-success.btn-block {
+    margin-left: 37%;
+    padding: 10px 30px;
+    font-size: 16px;
+    color: black;
+    background-color: #ffffff;
+    border-radius: 30px;
+    text-decoration: none;
+    margin-top: 15px;
+    width:25%;
+    font-weight: bold;
+    border:none;
+}
+
+
+.btn.btn-success.btn-block {
+    text-align: center;
+}
+
+a.btn {
+    color: #007bff;
+    margin-top: 10px;
+}
+
+.login-heading-text {
+    text-align: center;
+    margin-top: 30px;
+    color: #ffffff!important;
+}
+
+.field-validation-error {
+    color: #ff0000;
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-group .form-control {
+    padding-right: 40px;
+}
+
+.input-group-addon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 99;
+}
+
+.input-form-control{
+    border-radius: 10px !important;
+}
+
+.login-heading-text{
+    color:black;
+}

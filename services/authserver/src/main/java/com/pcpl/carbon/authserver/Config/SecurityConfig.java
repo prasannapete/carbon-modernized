@@ -1,0 +1,276 @@
+package com.pcpl.carbon.authserver.Config;
+
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.pcpl.carbon.authserver.User.Model.User;
+import com.pcpl.carbon.authserver.User.Repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.*;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+@Slf4j
+public class SecurityConfig {
+    private final JdbcTemplate jdbcTemplate;
+    private final UserRepository userRepository;
+    private static final String AUTHORITIES_CLAIM = "authorities";
+    private final PasswordEncoder passwordEncoder;
+
+    @Autowired
+    CBConfig cbConfig;
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+                new OAuth2AuthorizationServerConfigurer();
+        RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
+
+        http
+                .securityMatcher(endpointsMatcher)
+                .authorizeHttpRequests((authorize) -> authorize.anyRequest().authenticated())
+                .csrf((csrf) -> csrf.ignoringRequestMatchers(endpointsMatcher))
+                .with(authorizationServerConfigurer, (authorizationServer) ->
+                        authorizationServer.oidc(Customizer.withDefaults())    // Enable OpenID Connect 1.0
+                );
+//                .tokenGenerator(tokenGenerator()); //Custom token generator
+        http
+                // Redirect to the login page when not authenticated from the
+                // authorization endpoint
+                .exceptionHandling((exceptions) -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/login"),
+                                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+                        )
+                )
+                // Accept access tokens for User Info and/or Client Registration
+                .oauth2ResourceServer((resourceServer) -> resourceServer
+                        .jwt(Customizer.withDefaults()));
+
+        return http.build();
+    }
+
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        http
+                .authorizeHttpRequests((authorize) -> authorize
+                        .requestMatchers("/static/**").permitAll()
+                        .requestMatchers("/css/**").permitAll()
+                        .requestMatchers("/images/**").permitAll()
+                        .requestMatchers("/js/**").permitAll()
+                        .requestMatchers("/library/**").permitAll()
+                        .requestMatchers("/forgot-password-screen").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .formLogin(formLogin ->
+                        formLogin.loginPage("/login").permitAll()
+                )
+                .logout(logout ->
+                        logout.logoutUrl("/")
+                                .clearAuthentication(true)
+                                .deleteCookies("JSESSIONID", "SLSESSION")
+                                .permitAll()
+                );
+        return http.build();
+    }
+
+
+    @Bean
+    public RegisteredClientRepository registeredClientRepository() {
+        return new JdbcRegisteredClientRepository(jdbcTemplate);
+    }
+
+    @Bean
+    public JWKSource<SecurityContext> jwkSource() {
+        KeyPair keyPair = generateRsaKey();
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAKey rsaKey = new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
+                .keyID(UUID.randomUUID().toString())
+                .build();
+        JWKSet jwkSet = new JWKSet(rsaKey);
+        return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    private static KeyPair generateRsaKey() {
+        KeyPair keyPair;
+        try {
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            keyPair = keyPairGenerator.generateKeyPair();
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+        return keyPair;
+    }
+
+    @Bean
+    public JwtEncoder jwtEncoder() throws Exception{
+        return new NimbusJwtEncoder(jwkSource());
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
+        return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+    }
+
+    @Bean
+    public AuthorizationServerSettings authorizationServerSettings() {
+        return AuthorizationServerSettings.builder().build();
+    }
+
+    @Bean
+    public OAuth2TokenGenerator<?> tokenGenerator() {
+       try {
+           JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder());
+           jwtGenerator.setJwtCustomizer(jwtCustomizer());
+           OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
+           accessTokenGenerator.setAccessTokenCustomizer(accessTokenCustomizer());
+           OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();
+           return new DelegatingOAuth2TokenGenerator(
+                   jwtGenerator, accessTokenGenerator, refreshTokenGenerator);
+       }catch (Exception ex){
+           log.error(ex.getMessage());
+           log.error(Arrays.toString(ex.getStackTrace()));
+       }
+       return null;
+    }
+
+    @Bean
+    public OAuth2TokenCustomizer<OAuth2TokenClaimsContext> accessTokenCustomizer() {
+        return context -> {
+            if ("id_token".equals(context.getTokenType().getValue())) {
+                context.getClaims().claims((claims) -> {
+                    Set<String> roles = AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
+                            .stream()
+                            .map(authority -> authority.replace("ROLE_", ""))
+                            .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
+                    claims.put("roles", roles);
+
+                    Optional<User> optionalUser = userRepository.findByUserNameAndIsDeleted(context.getPrincipal().getName(), 0);
+                    Map<String, String> userData = new HashMap<>();
+                    if (optionalUser.isPresent()) {
+                        User user = optionalUser.get();
+                        userData.put("firstName", user.getFirstName());
+                        userData.put("lastName", user.getLastName());
+                        userData.put("userName",user.getUserName());
+                        claims.put("custom_value", userData);
+                    }
+                });
+            }
+            if (context.getTokenType().getValue().equals(OAuth2TokenType.ACCESS_TOKEN.getValue())) {
+                context.getClaims().claims((claims) -> {
+                    if (context.getAuthorizationGrantType().getValue().equals(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())) {
+                        Set<String> roles = context.getClaims().build().getClaim("scope");
+                        claims.put("roles", roles);
+                    } else if (context.getAuthorizationGrantType().getValue().equals(AuthorizationGrantType.AUTHORIZATION_CODE.getValue())) {
+                        Set<String> roles =  AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
+                                .stream()
+                                .map(authority -> authority.replace("ROLE_",""))
+                                .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
+                        claims.put("roles", roles);
+                        Optional< User> optionalUser = userRepository.findByUserNameAndIsDeleted(context.getPrincipal().getName(),0);
+                        Map<String,String> userData = new HashMap<>();
+                        if(optionalUser.isPresent()){
+                            User user = optionalUser.get();
+                            userData.put("firstName",user.getFirstName());
+                            userData.put("lastName",user.getLastName());
+                            userData.put("userName",user.getUserName());
+                            claims.put("custom_value", userData);
+
+                        }
+                    }
+
+                });
+            }
+            // Customize claims
+
+        };
+    }
+
+    @Bean
+    public OAuth2TokenCustomizer<JwtEncodingContext> jwtCustomizer() {
+        return (context) -> {
+            if ("id_token".equals(context.getTokenType().getValue())) {
+                context.getClaims().claims((claims) -> {
+                    Authentication principal = context.getPrincipal();
+                    Set<String> authorities = principal.getAuthorities().stream()
+                            .map(GrantedAuthority::getAuthority)
+                            .collect(Collectors.toSet());
+                    context.getClaims().claim(AUTHORITIES_CLAIM, authorities);
+                    Authentication authentication = context.getAuthorizationGrant();
+                });
+            }
+            if (context.getTokenType().getValue().equals(OAuth2TokenType.ACCESS_TOKEN.getValue())) {
+                context.getClaims().claims((claims) -> {
+                    if (context.getAuthorizationGrantType().getValue().equals(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue())) {
+                        Set<String> roles = context.getClaims().build().getClaim("scope");
+                        claims.put("roles", roles);
+                    } else if (context.getAuthorizationGrantType().getValue().equals(AuthorizationGrantType.AUTHORIZATION_CODE.getValue())) {
+                        Set<String> roles =  AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
+                               .stream()
+                               .map(authority -> authority.replace("ROLE_",""))
+                               .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
+                        claims.put("roles", roles);
+                        Optional< User> optionalUser = userRepository.findByUserNameAndIsDeleted(context.getPrincipal().getName(),0);
+                        Map<String,String> userData = new HashMap<>();
+                        if(optionalUser.isPresent()){
+                            User user = optionalUser.get();
+                            userData.put("firstName",user.getFirstName());
+                            userData.put("lastName",user.getLastName());
+                            userData.put("userName",user.getUserName());
+                            claims.put("custom_value", userData);
+
+                        }
+                    }
+
+                });
+            }
+
+        };
+    }
+}

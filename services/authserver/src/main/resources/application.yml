@@ -1,0 +1,57 @@
+server:
+  port: 9201
+  forward-headers-strategy: NATIVE
+  servlet:
+    session:
+      cookie:
+        name: ${AUTH_SESSION_NAME:SRLSESSION}
+spring:
+  config:
+    # Load the project-root .env (kept out of git) as a property source so ${DB_PASSWORD}
+    # resolves. Both paths are optional: ./ when run from the repo root (IntelliJ),
+    # ../../ when run from this module dir (mvn spring-boot:run).
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true&useSSL=false
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database: postgresql
+  application:
+    name: carbon-auth-server
+  thymeleaf:
+    prefix: ${AUTH_RES_TEMPLATE_PATH:file:///@project.basedir@/res/templates/}
+    cache: false
+  web:
+    resources:
+      static-locations: ${AUTH_RES_STATIC _PATH:file:///@project.basedir@/res/static/}
+com:
+  pcpl:
+    carbon:
+      issuerUrl: ${AUTH_ISSUER_URL:http://localhost:${server.port}}
+      webPageUrl: ${SRL_WEB_PAGE_URL:https://www.prapticonsulting.com}
+      cssPath: ${AUTH_RES_CSS_PATH:file:///@project.basedir@/res/static/css/}
+      imagesPath: ${AUTH_RES_IMAGE_PATH:file:///@project.basedir@/res/static/images/}
+      jsPath: ${AUTH_RES_JS_PATH:file:///@project.basedir@/res/static/js/}
+      library: ${AUTH_RES_LIBRARY_PATH:file:///@project.basedir@/res/static/library/}
+      bowerPath: ${AUTH_RES_BOWER_PATH:file:///@project.basedir@/res/static/bower_components}
+      homeUrl: ${SRL_HOME_URL:https://srl-dev-dashboard.prapticonsulting.com}
+      loginRedirectURL: ${SRL_LOGIN_REDIRECT_URL:https://srl-dev-dashboard.prapticonsulting.com}
+      seoNoIndex: true
+
+
+
+
+
+
+
+
+

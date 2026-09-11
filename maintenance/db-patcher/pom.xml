@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.pcpl.carbon</groupId>
+    <artifactId>db-patcher</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>db-patcher</name>
+    <description>Liquibase database maintenane</description>
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <build>
+        <filters>
+            <filter>${basedir}/src/main/filters/filter.properties</filter>
+        </filters>
+
+        <resources>
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <includes>
+                    <include>liquibase.properties</include>
+                </includes>
+                <filtering>true</filtering>
+                <targetPath>${basedir}/target/properties</targetPath>
+            </resource>
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <includes>
+                    <include>*.sql</include>
+                </includes>
+                <filtering>true</filtering>
+                <targetPath>${basedir}/target/changelogs</targetPath>
+            </resource>
+        </resources>
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.liquibase</groupId>
+                    <artifactId>liquibase-maven-plugin</artifactId>
+                    <version>4.23.2</version>
+                    <configuration>
+                        <promptOnNonLocalDatabase>false</promptOnNonLocalDatabase>
+                        <propertyFile>target/properties/liquibase.properties</propertyFile>
+                        <changeLogFile>changelog.xml</changeLogFile>
+                        <searchPath>${project.basedir}</searchPath>
+                    </configuration>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.postgresql</groupId>
+                            <artifactId>postgresql</artifactId>
+                            <version>42.6.0</version>
+                        </dependency>
+                        <!-- https://mvnrepository.com/artifact/org.yaml/snakeyaml -->
+                        <dependency>
+                            <groupId>org.yaml</groupId>
+                            <artifactId>snakeyaml</artifactId>
+                            <version>1.30</version>
+                        </dependency>
+                    </dependencies>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>
