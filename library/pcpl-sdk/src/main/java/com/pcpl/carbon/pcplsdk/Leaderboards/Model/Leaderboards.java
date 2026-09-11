@@ -7,12 +7,14 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "srl_leaderboards")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Leaderboards extends ApplicationModel {
     @Column(name = "leaderboard_name")
     private String leaderboardName;

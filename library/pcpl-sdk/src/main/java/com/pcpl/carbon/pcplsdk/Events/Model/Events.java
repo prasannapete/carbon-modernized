@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.*;
+import org.hibernate.annotations.Filter;
 
 import java.util.Date;
 
@@ -12,6 +13,7 @@ import java.util.Date;
 @Table(name = "cb_carbon_events")
 @Data
 @RequiredArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Events extends ApplicationModel {
 
     @Column(name = "tenant_id")

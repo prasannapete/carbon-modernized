@@ -1,5 +1,6 @@
 package com.pcpl.carbon.pcplsdk.Generic.Service;
 
+import com.pcpl.carbon.pcplsdk.Common.Context.TenantContext;
 import com.pcpl.carbon.pcplsdk.Common.Dto.FilterDto;
 import com.pcpl.carbon.pcplsdk.Common.Dto.FilterType;
 import com.pcpl.carbon.pcplsdk.Common.Dto.SortDto;
@@ -36,13 +37,14 @@ public abstract class AbstractCRUDService<E, D, R extends PCPLCRUDRepository<E>>
 //                throw new CustomException("Already exists!!", HttpStatus.CONFLICT);
 //            }
             E entity = convertDtoToEntity(dto);
+            applyTenant(entity);
             ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
             Validator validator = factory.getValidator();
             Set<ConstraintViolation<E>> violations = validator.validate(entity);
             if (!violations.isEmpty()) {
                 throw new ConstraintViolationException(violations);
             }
-            D responseDto = convertEntityToDto(pcplCRUDRepository.save(convertDtoToEntity(dto)));
+            D responseDto = convertEntityToDto(pcplCRUDRepository.save(entity));
             AppUtil.traceMethodExit();
             return responseDto;
         } catch (Exception e) {
@@ -55,7 +57,9 @@ public abstract class AbstractCRUDService<E, D, R extends PCPLCRUDRepository<E>>
     public List<D> saveAll(List<D> dtos) {
         try {
             AppUtil.traceMethodEntry();
-            List<D> responseDtos =  convertEntityListToDtoList(pcplCRUDRepository.saveAll(convertDtoListToEntityList(dtos)));
+            List<E> entities = convertDtoListToEntityList(dtos);
+            entities.forEach(this::applyTenant);
+            List<D> responseDtos =  convertEntityListToDtoList(pcplCRUDRepository.saveAll(entities));
             AppUtil.traceMethodExit();
             return responseDtos;
         } catch (Exception e) {
@@ -368,6 +372,30 @@ public abstract class AbstractCRUDService<E, D, R extends PCPLCRUDRepository<E>>
             throw new CustomException("Sorry, request failed. | Reason : " + exception.getMessage()
                     , HttpStatus.INTERNAL_SERVER_ERROR);
 
+        }
+    }
+
+    // ---------- Tenant write-stamping (row-level multi-tenancy) ----------
+
+    /**
+     * Stamp the current tenant (from {@link TenantContext}, i.e. the logged-in user's
+     * tenant) onto the entity before insert/update, so the tenant is never taken from the
+     * request body. No-op when there is no tenant in context or the entity is not
+     * tenant-scoped. Read isolation is handled separately by the Hibernate tenant filter.
+     */
+    protected void applyTenant(E entity) {
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId == null || entity == null) {
+            return;
+        }
+        try {
+            Method setter = entity.getClass().getMethod("setTenantId", Long.class);
+            setter.invoke(entity, tenantId);
+        } catch (NoSuchMethodException e) {
+            // entity is not tenant-scoped -> nothing to stamp
+        } catch (Exception e) {
+            throw new CustomException("Sorry, request failed. | Reason : " + e.getMessage()
+                    , HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

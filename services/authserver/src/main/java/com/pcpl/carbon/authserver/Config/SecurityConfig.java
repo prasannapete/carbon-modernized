@@ -15,6 +15,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.pcpl.carbon.authserver.Tenant.Service.TenantService;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -54,6 +57,15 @@ public class SecurityConfig {
     private final UserRepository userRepository;
     private static final String AUTHORITIES_CLAIM = "authorities";
     private final PasswordEncoder passwordEncoder;
+    private final TenantService tenantService;
+
+    /** Resolve the current request's tenant id (from its sub-domain) for token stamping. */
+    private Long resolveCurrentTenantId() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            return tenantService.resolveTenantId(attributes.getRequest());
+        }
+        return null;
+    }
 
     @Autowired
     CBConfig cbConfig;
@@ -221,6 +233,12 @@ public class SecurityConfig {
                             userData.put("lastName",user.getLastName());
                             userData.put("userName",user.getUserName());
                             claims.put("custom_value", userData);
+                            // Users with a tenant get a tenantId claim (scoped access).
+                            // Users with tenant_id null (e.g. super-admin) get no claim,
+                            // so downstream services grant them cross-tenant (all data) access.
+                            if (user.getTenantId() != null) {
+                                claims.put("tenantId", user.getTenantId());
+                            }
 
                         }
                     }
@@ -264,6 +282,12 @@ public class SecurityConfig {
                             userData.put("lastName",user.getLastName());
                             userData.put("userName",user.getUserName());
                             claims.put("custom_value", userData);
+                            // Users with a tenant get a tenantId claim (scoped access).
+                            // Users with tenant_id null (e.g. super-admin) get no claim,
+                            // so downstream services grant them cross-tenant (all data) access.
+                            if (user.getTenantId() != null) {
+                                claims.put("tenantId", user.getTenantId());
+                            }
 
                         }
                     }

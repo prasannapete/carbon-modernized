@@ -60,6 +60,27 @@ public class TenantService {
     }
 
     /**
+     * Resolve the tenant id for the current request from its sub-domain, matched against
+     * an active {@code cb_tenant} row. Returns {@code null} when there is no tenant
+     * sub-domain (localhost, IPs, bare domains) or no matching tenant. Used to stamp the
+     * tenant onto issued tokens so downstream services can scope data on a tenant basis.
+     */
+    public Long resolveTenantId(HttpServletRequest request) {
+        String subdomain = resolveSubdomain(request);
+        if (subdomain == null) {
+            return null;
+        }
+        try {
+            return tenantRepository.findByTenantNameIgnoreCaseAndIsDeleted(subdomain, 0)
+                    .map(Tenant::getId)
+                    .orElse(null);
+        } catch (Exception ex) {
+            log.warn("Tenant id lookup failed for sub-domain '{}': {}", subdomain, ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Resolve the login view name for the current request, falling back to
      * {@link #DEFAULT_LOGIN_TEMPLATE} when no tenant screen applies.
      *

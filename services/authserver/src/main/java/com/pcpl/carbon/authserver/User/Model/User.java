@@ -28,6 +28,9 @@ public class User implements Serializable {
     @GeneratedValue
     private Long id;
 
+    @Column(name = "tenant_id")
+    private Long tenantId;
+
     @Column(name = "first_name")
     @Length(max = 100, min = 1, message = "First name length should be between 1 and 100")
     @NotEmpty(message = "First Name cannot be empty")
