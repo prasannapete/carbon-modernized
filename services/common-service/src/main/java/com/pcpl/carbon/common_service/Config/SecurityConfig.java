@@ -2,12 +2,10 @@ package com.pcpl.carbon.commonservice.Config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 
@@ -15,32 +13,19 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-//    @Bean
-//    public WebSecurityCustomizer webSecurityCustomizer() {
-//        return (web) -> web.ignoring().requestMatchers("");
-//    }
-//
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//        http.cors(AbstractHttpConfigurer::disable)
-//                .authorizeHttpRequests((authorizeRequests) ->
-//                authorizeRequests
-//                        .requestMatchers( "").permitAll()
-//                        .anyRequest().authenticated()
-//        ).oauth2ResourceServer(oauth2 -> {
-//            oauth2.jwt(jwt -> jwt
-//                    .jwtAuthenticationConverter(jwtAuthenticationConverter())
-//            );
-//        });
-//
-//        return http.build();
-//    }
-//
-//    @Bean
-//    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-//        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-//        JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-//        converter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
-//        return converter;
-//    }
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                // Only the public leaderboard read endpoint is exempt from CSRF; every
+                // other request keeps the default CSRF handling.
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/leaderboard/get"))
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests
+                        // Public: allow the leaderboard read without authentication.
+                        .requestMatchers(HttpMethod.POST, "/leaderboard/get").permitAll()
+                        // Everything else keeps the existing JWT-based authentication.
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+
+        return http.build();
+    }
 }
