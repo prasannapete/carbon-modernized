@@ -1383,7 +1383,11 @@ CREATE TABLE cb_players_copy_data
     CONSTRAINT pk_cb_players_copy_data PRIMARY KEY (id)
 );
 
-
+--changeset sharanya:cb_user-add-is_play_mobil_user
+--preconditions onFail:MARK_RAN onError:HALT
+--precondition-sql-check expectedResult:f select exists(select 1 from information_schema.columns where table_name='cb_user' and column_name='is_play_mobil_user')
+alter table cb_user
+    add is_play_mobil_user integer default 0;
 
 
 
