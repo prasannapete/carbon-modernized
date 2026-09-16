@@ -1389,5 +1389,11 @@ CREATE TABLE cb_players_copy_data
 alter table cb_user
     add is_play_mobil_user integer default 0;
 
+--changeset sharanya:cb_roles-add-tenant_id
+--preconditions onFail:MARK_RAN onError:HALT
+--precondition-sql-check expectedResult:f select exists(select 1 from information_schema.columns where table_name='cb_roles' and column_name='tenant_id')
+alter table cb_roles
+    add tenant_id BIGINT;
+
 
 
