@@ -10,6 +10,7 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AppStoreSalesReportDTO {
+    private Long id;
     private Long tenantId;
     private String provider;
     private String providerCountry;

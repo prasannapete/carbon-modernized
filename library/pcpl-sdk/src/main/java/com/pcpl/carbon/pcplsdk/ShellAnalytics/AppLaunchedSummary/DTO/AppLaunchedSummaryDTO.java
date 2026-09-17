@@ -21,7 +21,7 @@ public class AppLaunchedSummaryDTO {
     private Date creationTime;
     private Long lastModifiedBy;
     private Date lastModifiedTime;
-    private int isDeleted;
+    private Integer isDeleted;
     private Long deletedBy;
     private Date deletedTime;
 }

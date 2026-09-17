@@ -74,7 +74,7 @@ public class User extends ApplicationModel {
     private int isPlayMobilUser;
 
     @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "srl_role_accounts",
+    @JoinTable(name = "cb_role_accounts",
             joinColumns = {
                     @JoinColumn(name = "account_id", referencedColumnName = "id")
             },

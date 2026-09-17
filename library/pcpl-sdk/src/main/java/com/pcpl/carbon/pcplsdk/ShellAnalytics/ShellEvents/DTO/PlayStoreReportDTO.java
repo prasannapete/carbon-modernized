@@ -10,6 +10,7 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PlayStoreReportDTO {
+    private Long id;
     private Long tenantId;
     private Date date;
     private String country;

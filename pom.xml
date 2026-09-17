@@ -44,6 +44,7 @@
         <module>services/authserver</module>
         <module>services/common-service</module>
         <module>library/pcpl-sdk</module>
+        <module>services/shell-analytics-service</module>
 <!--        <module>frontend/slweb</module>-->
     </modules>
 

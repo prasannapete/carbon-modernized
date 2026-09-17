@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PlayStoreReportGraphDTO {
     private String country;
+    private Long tenantId;
     private Integer month;
     private Integer year;
     private long downloadCount;
@@ -17,6 +18,15 @@ public class PlayStoreReportGraphDTO {
 
     public PlayStoreReportGraphDTO(String country, Integer month, Integer year, long downloadCount,String countryName) {
         this.country = country;
+        this.month = month;
+        this.year = year;
+        this.downloadCount = downloadCount;
+        this.countryName = countryName;
+    }
+
+    public PlayStoreReportGraphDTO(String country, Long tenantId, Integer month, Integer year, long downloadCount, String countryName) {
+        this.country = country;
+        this.tenantId = tenantId;
         this.month = month;
         this.year = year;
         this.downloadCount = downloadCount;

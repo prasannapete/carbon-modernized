@@ -1,6 +1,7 @@
 package com.pcpl.carbon.pcplsdk.ShellAnalytics.UserCountries.Model;
 
 import com.pcpl.carbon.pcplsdk.Common.Model.ApplicationModel;
+import org.hibernate.annotations.Filter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -13,6 +14,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class UserCountries extends ApplicationModel {
 
     @Column(name = "tenant_id")

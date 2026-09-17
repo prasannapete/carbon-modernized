@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class MasterCarsDTO {
-    private long id;
+    private Long id;
     private Long tenantId;
     private String country;
     private String countryCode;
