@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
+import org.hibernate.annotations.Filter;
 import org.hibernate.validator.constraints.Length;
 
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.List;
 @ToString
 @RequiredArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class User extends ApplicationModel {
 
     @Column(name = "tenant_id")
