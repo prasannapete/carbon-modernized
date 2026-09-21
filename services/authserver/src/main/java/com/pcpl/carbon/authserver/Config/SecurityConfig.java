@@ -36,10 +36,15 @@ import org.springframework.security.config.annotation.web.configuration.OAuth2Au
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.*;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -80,6 +85,8 @@ public class SecurityConfig {
 
         http
                 .securityMatcher(endpointsMatcher)
+                // Allow the SRL Dashboard SPA to call the token/OAuth2 endpoints cross-origin.
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests((authorize) -> authorize.anyRequest().authenticated())
                 .csrf((csrf) -> csrf.ignoringRequestMatchers(endpointsMatcher))
                 .with(authorizationServerConfigurer, (authorizationServer) ->
@@ -108,6 +115,7 @@ public class SecurityConfig {
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http)
             throws Exception {
         http
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers("/static/**").permitAll()
                         .requestMatchers("/css/**").permitAll()
@@ -115,20 +123,44 @@ public class SecurityConfig {
                         .requestMatchers("/js/**").permitAll()
                         .requestMatchers("/library/**").permitAll()
                         .requestMatchers("/forgot-password-screen").permitAll()
+                        // Benign Chrome DevTools probe (see LoginController) - answer without auth.
+                        .requestMatchers("/.well-known/appspecific/com.chrome.devtools.json").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(formLogin ->
                         formLogin.loginPage("/login").permitAll()
                 )
                 .logout(logout ->
-                        logout.logoutUrl("/")
+                        // The SRL Dashboard SPA triggers logout with a top-level GET redirect to
+                        // /logout (a cross-origin XHR cannot send the SRLSESSION cookie, so it could
+                        // never invalidate the SSO session). Invalidate the session, clear the real
+                        // session cookie (SRLSESSION), and return to the dashboard so it re-authenticates.
+                        logout.logoutRequestMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/logout"))
+                                .logoutSuccessUrl(cbConfig.getLoginRedirectURL())
+                                .invalidateHttpSession(true)
                                 .clearAuthentication(true)
-                                .deleteCookies("JSESSIONID", "SLSESSION")
+                                .deleteCookies("SRLSESSION", "JSESSIONID")
                                 .permitAll()
                 );
         return http.build();
     }
 
+
+    /**
+     * CORS for the SRL Dashboard SPA, which performs the authorization-code -> token
+     * exchange from the browser (cross-origin) against the OAuth2 endpoints.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3001"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
@@ -199,6 +231,7 @@ public class SecurityConfig {
                 context.getClaims().claims((claims) -> {
                     Set<String> roles = AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
                             .stream()
+                            .filter(authority -> !authority.startsWith("FACTOR_"))
                             .map(authority -> authority.replace("ROLE_", ""))
                             .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
                     claims.put("roles", roles);
@@ -222,6 +255,7 @@ public class SecurityConfig {
                     } else if (context.getAuthorizationGrantType().getValue().equals(AuthorizationGrantType.AUTHORIZATION_CODE.getValue())) {
                         Set<String> roles =  AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
                                 .stream()
+                                .filter(authority -> !authority.startsWith("FACTOR_"))
                                 .map(authority -> authority.replace("ROLE_",""))
                                 .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
                         claims.put("roles", roles);
@@ -258,6 +292,7 @@ public class SecurityConfig {
                     Authentication principal = context.getPrincipal();
                     Set<String> authorities = principal.getAuthorities().stream()
                             .map(GrantedAuthority::getAuthority)
+                            .filter(authority -> !authority.startsWith("FACTOR_"))
                             .collect(Collectors.toSet());
                     context.getClaims().claim(AUTHORITIES_CLAIM, authorities);
                     Authentication authentication = context.getAuthorizationGrant();
@@ -271,7 +306,8 @@ public class SecurityConfig {
                     } else if (context.getAuthorizationGrantType().getValue().equals(AuthorizationGrantType.AUTHORIZATION_CODE.getValue())) {
                         Set<String> roles =  AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
                                .stream()
-                               .map(authority -> authority.replace("ROLE_",""))
+                               .filter(authority -> !authority.startsWith("FACTOR_"))
+                                .map(authority -> authority.replace("ROLE_",""))
                                .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
                         claims.put("roles", roles);
                         Optional< User> optionalUser = userRepository.findByUserNameAndIsDeleted(context.getPrincipal().getName(),0);

@@ -1,0 +1,184 @@
+.app-launches {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.section-tabs .tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    transition: all 0.3s ease;
+}
+
+.section-tabs .tab.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+}
+
+.section-tabs .tab:hover:not(.active) {
+    color: #333;
+    background-color: #f8f9fa;
+}
+
+.launches-content {
+    padding-top: 20px;
+}
+
+.launches-grid {
+    height: 400px;
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.launches-chart h3,
+.launches-summary h3 {
+    font-size: 1.2rem;
+    color: #333;
+    margin: 0 0 20px 0;
+    font-weight: 600;
+}
+.launches-chart,
+.launches-summary {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-container {
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.launches-summary {
+    overflow-y: auto;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    overflow-y: auto;
+}
+
+.summary-table th,
+.summary-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+.summary-table thead,
+.summary-table tfoot {
+    position: sticky;
+    background: #f8f9fa;
+}
+
+.summary-table thead {
+    top: 0;
+}
+
+.summary-table tfoot {
+    bottom: 0;
+}
+.summary-table tbody {
+    display: block;
+    max-height: 220px; /* adjust to desired viewport space */
+    overflow-y: auto;
+}
+.summary-table thead,
+.summary-table tfoot,
+.summary-table tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+.summary-table tbody {
+    width: 100%;
+}
+
+.summary-table th,
+.summary-table td {
+    box-sizing: border-box;
+}
+.summary-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+}
+
+.summary-table .total-row {
+    background-color: #e3f2fd;
+    font-weight: 500;
+}
+
+.brand-content {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+}
+
+.custom-tooltip {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tooltip-label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+@media (max-width: 1024px) {
+    .launches-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .app-launches {
+        padding: 15px;
+    }
+
+    .section-tabs {
+        flex-wrap: wrap;
+    }
+
+    .chart-container {
+        height: 250px;
+    }
+}
+
+.average-stats{
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 460px;
+}
+.average-length{
+    max-height:  375px !important;
+}
+.customer-header{
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+    padding: 5px;
+    font-size: 14px;
+}

@@ -9,12 +9,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 
 import java.util.Optional;
@@ -34,6 +37,17 @@ public class LoginController {
     @GetMapping(value = "/")
     public String login(Model model) {
         return "redirect:/login";
+    }
+
+    /**
+     * Chrome DevTools auto-probes this path when it is open, looking for an "automatic
+     * workspace folders" config. There is nothing to serve, so return 204 No Content
+     * instead of letting it fall through to a 404 Whitelabel error / logged stack trace.
+     */
+    @GetMapping("/.well-known/appspecific/com.chrome.devtools.json")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ResponseBody
+    public void chromeDevtoolsProbe() {
     }
     @RequestMapping(value = "/success")
     public String loginSuccess(Model model) {

@@ -1,0 +1,103 @@
+@font-face {
+    font-family: 'MontserratThin';
+    src: url('../assets/fonts/Montserrat/static/Montserrat-Thin.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'MontserratBlack';
+    src: url('../assets/fonts/Montserrat/static/Montserrat-Black.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'MontserratRegular';
+    src: url('../assets/fonts/Montserrat/static/Montserrat-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+body{
+    font-family: "MontserratRegular" !important;
+}
+.dashboard {
+    min-height: 100vh;
+    background-color: #f5f5f5;
+    padding: 20px;
+}
+
+.dashboard-header {
+    margin-bottom: 30px;
+}
+
+.dashboard-header h1 {
+    font-size: 2.5rem;
+    color: #333;
+    margin: 0;
+    font-weight: 600;
+}
+
+.dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+@media (max-width: 768px) {
+    .dashboard {
+        padding: 15px;
+    }
+
+    .dashboard-header h1 {
+        font-size: 2rem;
+    }
+
+    .dashboard-content {
+        gap: 20px;
+    }
+}
+
+.settings-link {
+    margin-left: auto;
+    font-size: 18px;
+    font-weight: bold!important;
+    padding: 8px 16px;
+    background-color: #f3f4f6;
+    color: #111827;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+.settings-link:hover {
+    background-color: #e5e7eb;
+}
+.action-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    text-decoration: none;
+    background-color: #f3f4f6;
+    color: #111827;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.action-link:hover {
+    background-color: #e5e7eb;
+}
+
+.logout-variant {
+    background-color: #fef2f2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
+.logout-variant:hover {
+    background-color: #fee2e2;
+}
+

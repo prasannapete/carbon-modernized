@@ -1,0 +1,194 @@
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.summary-table th,
+.summary-table td {
+  border-bottom: 1px solid #ddd;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.summary-table th {
+  background-color: #f9f9f9;
+  font-weight: bold;
+}
+
+.summary-table tfoot .total-row {
+  background-color: #eaf4ff; /* light blue, subtle */
+  font-weight: bold;
+}
+
+.summary-table tfoot .total-row td {
+  border-top: 2px solid #007bff;
+}
+
+.summary-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/*!* Optional: consistent alignment for numeric columns *!*/
+/*.summary-table td:nth-child(2),*/
+/*.summary-table td:nth-child(3) {*/
+/*  text-align: right;*/
+/*}*/
+.printable-summary-table tbody{
+    height: auto!important;
+    overflow: hidden;
+}
+.printable-summary-table .average-length, .printable-average-stats{
+    height: auto!important;
+    overflow: hidden!important;
+    max-height: none!important;
+}
+@page {
+  size: A4;
+  margin-top: 20mm;
+  margin-right: 10mm;
+  margin-bottom: 20mm;
+  margin-left: 10mm;
+    background-image: url("../assets/carbon-logo.png");
+}
+.printable-summary-table{
+    margin-bottom: 10px
+}
+.recharts-default-legend {
+  margin-top: 35px !important;
+}
+
+@media print {
+  .country-content {
+    display: block !important;
+    height: auto !important;
+    visibility: visible !important;
+  }
+  .scrollable-content {
+      overflow: visible !important;
+      max-height: none !important;
+    }
+    .recharts-responsive-container {
+        width: 600px !important;
+        height: 300px !important;
+      }
+      .country-section, .app-launches {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+
+    .cars-summary,
+      .cars-chart-printable,
+      .chart-container,
+      table,
+       .launches-summary,
+       .launches-chart-printable{
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      .country-section {
+        margin-bottom: 2rem; /* optional, add space between sections */
+      }
+      .country-header{
+        margin-top: 2rem;
+      }
+      .summary-table {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+    .print-total-row{
+        color: #ffffff;
+        background-color: #141d3d!important;
+        margin-bottom: 50px;
+    }
+        .summary-table tfoot .total-row {
+            color: #ffffff;
+            background-color: #141d3d!important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+            border-top: none !important;
+            margin-bottom: 50px!important;
+        }
+    .summary-table tfoot .total-row td{
+        border-top: none!important;
+    }
+        .cars-summary,
+          .cars-grid,
+          .country-content,
+           .launches-summary,
+           .launches-content,
+           .launches-grid{
+            display: block !important;
+          }
+
+          .launches-grid,
+            .launches-chart,
+            .launches-summary,
+            .chart-container {
+              display: block !important;
+              width: 100% !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+
+            .launches-chart {
+              margin-bottom: 20mm !important;
+            }
+            .dashboard-content,
+              .printable-dashboard-content {
+                display: block !important;
+              }
+
+              .printable-dashboard-content > div {
+                display: block !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 25mm !important;
+              }
+              .country-print-section {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 50px;
+              }
+
+              .print-country-wise-section {
+                page-break-before: auto !important;
+                page-break-after: avoid !important;
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+              }
+
+              .country-print-section:not(:first-child) {
+                margin-top: 60px;
+              }
+    .page-break {
+        page-break-before: always; /* or break-before for modern browsers */
+    }
+}
+.carbon-logo{
+    height: 20%!important;
+    width: 20%!important;
+}
+.printable-dashboard-content .filter-controls{
+    background-color: #141d3d;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    margin-top:10px ;
+}
+.print-date-section{
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 24px;
+}
+.printable-summary-table th, .printable-summary-table td{
+    text-align: center!important;
+}
+.stats-title,.country-header-title.expanded{
+    color: #ffffff!important;
+    font-weight: bold;
+    background-color: #141d3d!important;
+}
+

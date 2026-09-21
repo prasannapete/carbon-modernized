@@ -1,0 +1,169 @@
+.store-performance {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.store-performance h2 {
+    font-size: 1.5rem;
+    color: #333;
+    margin: 0 0 20px 0;
+    font-weight: 600;
+}
+
+.store-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.store-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.store-header {
+    background-color: #f8f9fa;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.store-header h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.country-tabs {
+    display: flex;
+    gap: 10px;
+}
+
+.tab {
+    padding: 6px 12px;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s ease;
+}
+
+.tab.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.tab:hover:not(.active) {
+    background-color: #f8f9fa;
+}
+
+.store-content {
+    padding: 20px;
+}
+
+.app-info {
+    margin-bottom: 20px;
+}
+
+.app-title {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.metrics-bar {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: #666;
+}
+
+.metrics-bar span {
+    padding: 4px 8px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.downloads-info {
+    margin-bottom: 20px;
+}
+
+.total-downloads {
+    text-align: left;
+}
+
+.total-downloads span {
+    font-size: 11px;
+    color: #666;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.downloads-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.chart-container {
+    height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-title {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+@media (max-width: 1024px) {
+    .store-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .store-performance {
+        padding: 15px;
+    }
+
+    .store-content {
+        padding: 15px;
+    }
+
+    .metrics-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .chart-container {
+        height: 200px;
+    }
+}
+
+.scroll-x {
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.scroll-x .tab {
+    display: inline-block;
+    margin-right: 8px;
+}
+.app-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.app-icon {
+    width: 24px;
+    height: 24px;
+}
