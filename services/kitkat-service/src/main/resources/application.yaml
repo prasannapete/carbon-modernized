@@ -1,0 +1,57 @@
+server:
+  # Dedicated port for kitkat (9201 auth, 9202 common-service, 9203 shell-analytics).
+  # Override with SERVER_PORT if needed.
+  port: ${SERVER_PORT:9204}
+  forward-headers-strategy: NATIVE
+spring:
+  application:
+    name: kitkat-service
+  config:
+    # Load the project-root .env (kept out of git) as a property source so ${DB_HOST},
+    # ${DB_PORT}, ${DB_NAME}, ${DB_USER}, ${DB_PASSWORD} etc. resolve. Both paths are
+    # optional: ./ when run from the repo root (IntelliJ), ../../ when run from this
+    # module dir (mvn spring-boot:run).
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true&useSSL=false
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database: postgresql
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Provides the JwtDecoder bean that SecurityConfig's oauth2ResourceServer().jwt()
+          # requires, from the auth server's JWKS endpoint (as in shell-analytics).
+          jwk-set-uri: ${JWK_SET_URI:http://localhost:9201/oauth2/jwks}
+  mail:
+    # SMTP settings for the JavaMailSender bean; values come from the project-root .env.
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+  sendgrid:
+    api-key: ${SENDGRID_API_KEY}
+management:
+  health:
+    # SMTP and Redis are optional in local/dev and are not run on the dev machine.
+    # Disable their health probes so the actuator health check doesn't log
+    # connection-refused warnings for services that aren't expected to be up here.
+    mail:
+      enabled: false
+    redis:
+      enabled: false
+com:
+  pcpl:
+    carbon:
+      # Supplied by the project-root .env (kept out of git).
+      excelUploadPath: ${FILE_UPLOAD_PATH:}
