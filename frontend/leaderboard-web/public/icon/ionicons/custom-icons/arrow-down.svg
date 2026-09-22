@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="97" height="97" viewBox="0 0 97 97">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_4" data-name="Rectangle 4" width="97" height="97" transform="translate(244 409)" fill="#fff"/>
+    </clipPath>
+    <clipPath id="clip-path-2">
+      <rect id="Rectangle_3" data-name="Rectangle 3" width="97" height="96" transform="translate(244 410)" fill="#fff"/>
+    </clipPath>
+  </defs>
+  <g id="Arrow" transform="translate(341 506) rotate(180)" clip-path="url(#clip-path)">
+    <g id="Group_3" data-name="Group 3" clip-path="url(#clip-path-2)">
+      <g id="Group_2" data-name="Group 2" clip-path="url(#clip-path-2)">
+        <g id="Group_1" data-name="Group 1" clip-path="url(#clip-path-2)">
+          <path id="Path_1" data-name="Path 1" d="M257,458a36,36,0,1,1,36,36,36,36,0,0,1-36-36m-2,0a38,38,0,1,0,38-38A38,38,0,0,0,255,458Z" fill="#fff" stroke="#fff" stroke-width="1"/>
+          <path id="Path_2" data-name="Path 2" d="M292.293,433.292l-15,15a1,1,0,0,0,1.414,1.414l13.276-13.276c.009-.009.017-.006.017.007v46.229a1,1,0,0,0,2,0V436.437a.011.011,0,0,1,.01-.01.009.009,0,0,1,.007,0l13.276,13.276a1,1,0,0,0,1.439-1.389l-.025-.025-15-15A1,1,0,0,0,292.293,433.292Z" fill="#fff" stroke="#fff" stroke-width="1"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
