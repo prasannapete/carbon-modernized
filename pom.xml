@@ -46,6 +46,7 @@
         <module>library/pcpl-sdk</module>
         <module>services/shell-analytics-service</module>
         <module>services/kitkat-service</module>
+        <module>services/playmobil-service</module>
 <!--        <module>frontend/slweb</module>-->
     </modules>
 
