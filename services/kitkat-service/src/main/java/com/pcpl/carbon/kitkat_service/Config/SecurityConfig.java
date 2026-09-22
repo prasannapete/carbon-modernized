@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -22,6 +23,17 @@ public class SecurityConfig {
             "/events/kk-race-played/race-info",
             "/carbon-events/get-all-events"
     };
+
+    // The Leaderboard Web's leaderboard data API. Exposed fully publicly (no login)
+    // via web.ignoring() below — the same mechanism SRL Dashboard's shell-analytics
+    // uses for its public endpoints. This bypasses the JWT filter and CSRF for this
+    // path, so the leaderboard loads without a token even if a stale one is present.
+    private static final String LEADERBOARD_PUBLIC_ENDPOINT = "/carbon-events/get-leader-board-events";
+
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (web) -> web.ignoring().requestMatchers(LEADERBOARD_PUBLIC_ENDPOINT);
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

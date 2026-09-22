@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="100" viewBox="0 0 100 100">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_4" data-name="Rectangle 4" width="100" height="100" transform="translate(-430 72)"/>
+    </clipPath>
+    <clipPath id="clip-path-2">
+      <rect id="Rectangle_3" data-name="Rectangle 3" width="99.762" height="100" transform="translate(0)"/>
+    </clipPath>
+    <clipPath id="clip-path-3">
+      <rect id="Rectangle_2" data-name="Rectangle 2" width="99.762" height="100.238"/>
+    </clipPath>
+  </defs>
+  <g id="Supplier" transform="translate(430 -72)" clip-path="url(#clip-path)">
+    <g id="Group_3" data-name="Group 3" transform="translate(-430 72)" clip-path="url(#clip-path-2)">
+      <g id="Group_2" data-name="Group 2" transform="translate(0)" clip-path="url(#clip-path-3)">
+        <g id="Group_1" data-name="Group 1" clip-path="url(#clip-path-3)">
+          <path id="Path_1" data-name="Path 1" d="M125.025,96.156h-5.2V73.917a6.249,6.249,0,0,0,4.157-5.885V62.594L117.377,48.24h-61.6L49.164,62.594v5.437a6.249,6.249,0,0,0,4.157,5.885v22.24h-5.2v6.25h5.2v21.875h66.508V102.406h5.2Zm-7.274,0h-2.078V74.281h2.078ZM59.556,74.2a7.273,7.273,0,0,0,5.2-3.472,7.271,7.271,0,0,0,6.235,3.555h2.078A7.271,7.271,0,0,0,79.3,70.726a7.271,7.271,0,0,0,6.235,3.555h2.078a7.271,7.271,0,0,0,6.235-3.555,7.271,7.271,0,0,0,6.235,3.555h2.078a7.271,7.271,0,0,0,6.235-3.555,7.274,7.274,0,0,0,5.2,3.472V96.156H59.556ZM80.34,62.9l1.931-12.58h8.609L92.81,62.9V66.99a5.208,5.208,0,0,1-5.2,5.208H85.536a5.208,5.208,0,0,1-5.2-5.208Zm35.707-12.58,5.861,12.729v4.979a4.162,4.162,0,0,1-4.157,4.167h-3.118a5.208,5.208,0,0,1-5.2-5.208v-4.36l-4.722-12.306Zm-8.688,12.694V66.99a5.208,5.208,0,0,1-5.2,5.208h-2.078a5.208,5.208,0,0,1-5.2-5.208V62.823l-1.907-12.5h9.506Zm-29.1-.194V66.99a5.208,5.208,0,0,1-5.2,5.208H70.987a5.208,5.208,0,0,1-5.2-5.208V63.017l4.871-12.694h9.505L78.274,62.665ZM51.243,68.031V63.052L57.1,50.323H68.431L63.713,62.629v4.36a5.208,5.208,0,0,1-5.2,5.208H55.4A4.162,4.162,0,0,1,51.243,68.031Zm4.157,6.25h2.078V96.156H55.4ZM117.751,122.2H55.4V102.406h62.352Zm5.2-21.875H50.2V98.239h72.743Z" transform="translate(-36.694 -36.781)" fill="#fff"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

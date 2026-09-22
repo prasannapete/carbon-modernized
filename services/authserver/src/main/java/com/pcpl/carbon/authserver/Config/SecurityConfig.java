@@ -136,7 +136,20 @@ public class SecurityConfig {
                         // never invalidate the SSO session). Invalidate the session, clear the real
                         // session cookie (SRLSESSION), and return to the dashboard so it re-authenticates.
                         logout.logoutRequestMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/logout"))
-                                .logoutSuccessUrl(cbConfig.getLoginRedirectURL())
+                                // Default target is the SRL Dashboard (unchanged). A caller may pass
+                                // ?redirect=<url> to return elsewhere after logout, but ONLY for known
+                                // local app origins (localhost:3000/3001) so the Leaderboard Web (:3001)
+                                // can return to its own login instead of the dashboard. Restricting to
+                                // those origins keeps this from being an open redirect.
+                                .logoutSuccessHandler((request, response, authentication) -> {
+                                    String redirect = request.getParameter("redirect");
+                                    String target = (redirect != null
+                                            && (redirect.startsWith("http://localhost:3000")
+                                                || redirect.startsWith("http://localhost:3001")))
+                                            ? redirect
+                                            : cbConfig.getLoginRedirectURL();
+                                    response.sendRedirect(target);
+                                })
                                 .invalidateHttpSession(true)
                                 .clearAuthentication(true)
                                 .deleteCookies("SRLSESSION", "JSESSIONID")
