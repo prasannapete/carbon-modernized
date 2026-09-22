@@ -1,0 +1,195 @@
+@media (min-width: 768px) and (max-width: 1023px) {
+    .participant-name-col{
+        width: 75%!important;
+    }
+    .score-section{
+        width: 25%!important;
+    }
+    .carousel-item-inner-content{
+        margin-left: 13px!important;
+    }
+}
+@media (min-width: 425px) and (max-width: 767px){
+    .event-name-section{
+        font-size: 20px;
+    }
+
+}
+@media (min-width: 320px) and (max-width: 425px) {
+
+    .uploaded-logo-img{
+        height: 50px;
+    }
+    .event-lists-header-content{
+        font-size: 16px;
+    }
+    .main-container{
+        margin-top: 2rem;
+    }
+    .participant-name-col{
+        width: 65%!important;
+    }
+    .score-section{
+        width: 35%!important;
+    }
+    .event-name-section{
+        font-size: 18px;
+    }
+    .data-section{
+        padding: 0px!important;
+    }
+    .carousel-item-inner-content{
+        margin-left: 0px!important;
+    }
+    .leaderboard-score-column{
+        width: 37%;
+    }
+    .leaderboard-name-col{
+        width: 63%;
+    }
+    .carousel-btn{
+        height: 40px!important;
+        width: 40px!important;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px){
+    .my-orders-header-output {
+        padding: 0px 15px;
+    }
+}
+
+@media (min-width: 320px) and (max-width: 768px) {
+    .event-lists-output{
+        padding: 10px 0px;
+    }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px){
+    .leaderboard-score-column{
+        padding-left: 12px;
+    }
+    .event-lists-output{
+        padding: 10px 0px;
+    }
+}
+
+
+@media (min-width: 425px) and (max-width: 767px){
+    .create-event-input,.score-type-dropdowns, .score-type-dropdowns:focus, .create-event-input:focus{
+        width: 330px;
+    }
+    #create-events-form{
+        width: 350px;
+    }
+    .create-event-container{
+        font-size: 20px;
+    }
+    #import-logo-photo{
+        font-size: 16px;
+    }
+    .save-btn, .cancel-btn, .reset-btn{
+        width: 115px;
+    }
+
+}
+@media (min-width: 320px) and (max-width: 424px){
+    .create-event-input,.score-type-dropdowns, .score-type-dropdowns:focus{
+        width: 270px;
+    }
+    #create-events-form{
+        width: 300px;
+    }
+    .create-event-container{
+        font-size: 20px;
+    }
+    #import-logo-photo{
+        font-size: 16px;
+    }
+    .save-btn, .cancel-btn, .reset-btn{
+        width: 115px;
+    }
+
+}
+@media (min-width: 320px) and (max-width: 374px){
+    .create-event-input,.score-type-dropdowns, .score-type-dropdowns:focus{
+        width: 230px;
+    }
+    #create-events-form{
+        width: 250px;
+    }
+    .events-input-date{
+        width: 175px;
+    }
+    .calender-img{
+        height: 25px;
+    }
+    .save-btn, .cancel-btn, .reset-btn{
+        width: 100px;
+        font-size: 20px;
+    }
+}
+
+/***********************add-participant-popup************************/
+
+@media (max-width: 425px) {
+    .add-participant-modal-input, .add-participant-modal-input:focus{
+        width: 325px;
+        font-size: 16px;
+    }
+
+    .field-validation-error, .append-validation-error{
+        font-size: 14px !important;
+    }
+
+
+    .add-participant-btn-section{
+         margin-top:0;
+    }
+
+    .save-btn, .cancel-btn, .reset-btn {
+         width: 90px;
+         height: 45px;
+         font-size: 16px;
+         }
+
+    .save-btn:hover, .cancel-btn:hover, .reset-btn:hover {
+        width: 90px;
+        height: 45px;
+        font-size: 16px;
+        }
+
+    .edit-icon, .delete-icon{
+        width: 30px;
+     }
+
+    .delete-icon{
+    width: 25px;
+    }
+}
+
+@media (max-width: 375px) {
+    .add-participant-input, .add-participant-modal-input, .add-participant-modal-input:focus{
+        width: 265px;
+    }
+}
+
+@media (max-width: 320px) {
+    .add-participant-input, .add-participant-modal-input, .add-participant-modal-input:focus{
+        width: 215px;
+    }
+}
+
+@media (min-width: 320px) and (max-width: 425px) {
+    .purchase-analytics-section-header{
+        font-size: 22px;
+    }
+    .cancel-img, .circled-logout-icon, .save-img {
+        width: 25px!important;
+    }
+    .yes-delete-it, .yes-delete-it:hover, .log-me-out-icon, .log-me-out-icon:hover,.close-icon, .close-icon:hover {
+        width: 50px;
+        height: 50px;
+    }
+
+}
