@@ -1,0 +1,20 @@
+/*
+ * The reference app had `body > .content-wrap` directly, so `min-height:100%`
+ * resolved and the white body filled the viewport. This React app nests everything
+ * under `#root`, which broke the percentage-height chain and let the page background
+ * (the event primaryColor that getAllEvents paints on <html>) show below the content
+ * as a "half blue" area. Giving the chain a definite height restores the original look:
+ * the white body fills the viewport; pages that want the themed background (leaderboard /
+ * display score) still set it on <html> and make the body transparent themselves.
+ */
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+}
+
+#root {
+  min-height: 100%;
+}
