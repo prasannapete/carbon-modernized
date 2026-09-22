@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="793" height="793" viewBox="0 0 793 793">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_4" data-name="Rectangle 4" width="793" height="793" transform="translate(2864 646)" fill="#fff"/>
+    </clipPath>
+    <clipPath id="clip-path-2">
+      <rect id="Rectangle_3" data-name="Rectangle 3" width="790" height="790" transform="translate(2865 646)" fill="#fff"/>
+    </clipPath>
+  </defs>
+  <g id="business-building" transform="translate(-2864 -646)" clip-path="url(#clip-path)">
+    <g id="Group_3" data-name="Group 3" clip-path="url(#clip-path-2)">
+      <g id="Group_2" data-name="Group 2" clip-path="url(#clip-path-2)">
+        <g id="Group_1" data-name="Group 1" clip-path="url(#clip-path-2)">
+          <path id="Path_1" data-name="Path 1" d="M3489.83,1008.17a32.83,32.83,0,0,1-65.66,0V975.333l-16.42-164.166h65.67l16.41,164.166Zm-131.33,0a32.835,32.835,0,0,1-65.67,0V975.333l-8.21-164.166h65.67l8.21,164.166Zm-131.33-32.837v32.837a32.835,32.835,0,0,1-65.67,0V975.333l8.21-164.166h65.66ZM3194.33,1238H3063V1106.67h131.33Zm-164.16-229.83V975.333l16.41-164.166h65.67l-16.42,164.166v32.837a32.83,32.83,0,0,1-65.66,0Zm492.5-246.253H2997.33L2964.5,975.333v32.837a32.922,32.922,0,0,0,32.83,32.83v279.08h279.09V1106.67H3457v213.41h65.67V1041a32.929,32.929,0,0,0,32.83-32.83V975.333Z" fill="#fff"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
