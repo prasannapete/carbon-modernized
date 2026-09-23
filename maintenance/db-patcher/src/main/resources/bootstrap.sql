@@ -1395,5 +1395,14 @@ alter table cb_user
 alter table cb_roles
     add tenant_id BIGINT;
 
+--changeset sharanya:cb_app_features-add-mib_id
+--preconditions onFail:MARK_RAN onError:HALT
+--precondition-sql-check expectedResult:f select exists(select 1 from information_schema.columns where table_name='cb_app_features' and column_name='mib_id')
+ALTER TABLE cb_app_features ADD COLUMN mib_id VARCHAR(40);
+
+--changeset sharanya:cb_app_features_aud-add-mib_id
+--preconditions onFail:MARK_RAN onError:HALT
+--precondition-sql-check expectedResult:f select exists(select 1 from information_schema.columns where table_name='cb_app_features_aud' and column_name='mib_id')
+ALTER TABLE cb_app_features_aud ADD COLUMN mib_id VARCHAR(40);
 
 
