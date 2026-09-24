@@ -161,13 +161,16 @@ public class SecurityConfig {
 
 
     /**
-     * CORS for the SRL Dashboard SPA, which performs the authorization-code -> token
-     * exchange from the browser (cross-origin) against the OAuth2 endpoints.
+     * CORS for the local SPAs, which perform the authorization-code -> token
+     * exchange from the browser against the OAuth2 endpoints. SRL Dashboard (3000),
+     * playMobil (3001) and Leaderboard Web (3002) each proxy the token call so the
+     * authserver sees their http://localhost:<port> Origin — all three must be allowed
+     * or the token POST is rejected at the CORS layer with 403.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3001"));
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:3002"));
         configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
