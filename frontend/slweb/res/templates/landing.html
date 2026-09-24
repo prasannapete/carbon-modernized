@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body>
+<br>
+<p>You are being redirected to the Shell Racing Legends App...</p>
+<br>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    window.location.replace("shellracinglegends://consumerdetails?accessCode=" + urlParams.get('accessCode'));
+</script>
+</body>
+</html>

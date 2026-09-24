@@ -1,0 +1,226 @@
+.filter-container {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.filter-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 16px 0;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.filter-input-group {
+    flex: 1;
+    position: relative;
+}
+
+.filter-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #374151;
+    background-color: white;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+/* Apply your existing filter-input styles to react-select */
+.react-select__control {
+    width: 100%;
+    min-height: 44px; /* match DatePicker height, adjust if needed */
+    padding: 0 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #374151;
+    background-color: white;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+
+
+.react-select__value-container {
+    padding: 0;
+    min-height: 44px;
+}
+
+
+
+
+.filter-input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+    border-color: transparent;
+}
+
+.filter-input:hover {
+    border-color: #9ca3af;
+}
+
+.filter-input::placeholder {
+    color: #9ca3af;
+    font-size: 14px;
+}
+
+.filter-button {
+    padding: 12px 32px;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+    height: fit-content;
+}
+
+.filter-button:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.filter-button:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+    border-color: transparent;
+}
+
+.filter-button:active {
+    background-color: #f3f4f6;
+}
+
+/* DatePicker custom styles */
+.react-datepicker-wrapper {
+    width: 100%;
+}
+
+.react-datepicker__input-container {
+    width: 100%;
+}
+
+.react-datepicker-popper {
+    z-index: 1000;
+}
+
+.react-datepicker {
+    font-family: inherit;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.react-datepicker__header {
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    border-radius: 8px 8px 0 0;
+    padding: 8px 0;
+}
+
+.react-datepicker__current-month {
+    color: #111827;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.react-datepicker__day-name {
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.react-datepicker__day {
+    color: #374151;
+    font-size: 13px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.react-datepicker__day:hover {
+    background-color: #f3f4f6;
+}
+
+.react-datepicker__day--selected {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.react-datepicker__day--selected:hover {
+    background-color: #2563eb;
+}
+
+.react-datepicker__day--keyboard-selected {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.react-datepicker__day--today {
+    font-weight: 600;
+    color: #3b82f6;
+}
+
+.react-datepicker__navigation {
+    top: 12px;
+}
+
+.react-datepicker__navigation--previous {
+    left: 12px;
+}
+
+.react-datepicker__navigation--next {
+    right: 12px;
+}
+
+.react-datepicker__navigation-icon::before {
+    border-color: #6b7280;
+}
+
+.react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+    border-color: #374151;
+}
+
+/* Clear button styling */
+.react-datepicker__close-icon {
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: transparent;
+    color: #9ca3af;
+    font-size: 16px;
+}
+
+.react-datepicker__close-icon:hover {
+    color: #6b7280;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .filter-input-group {
+        flex: none;
+    }
+
+    .filter-button {
+        width: 100%;
+    }
+}

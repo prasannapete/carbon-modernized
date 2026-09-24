@@ -1,0 +1,60 @@
+server:
+  error:
+    whitelabel:
+      enabled: false
+  port: 9205
+  servlet:
+    session:
+      cookie:
+        name: SLSESSION
+spring:
+  application:
+    name: srl-web
+  thymeleaf:
+    prefix: file:///@project.basedir@/res/templates/
+    cache: false
+  web:
+    resources:
+      static-locations: file:///@project.basedir@/res/static/
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWK_SET_URI:https://srl-dev-auth.prapticonsulting.com/oauth2/jwks}
+      client:
+        registration:
+          egov-client:
+            provider: pcpl
+            client-id: egov-client
+            client-secret: P@ssw0rd
+            authorization-grant-type: authorization_code
+            redirect-uri: ${SL_REDIRECT_URI:http://localhost:9102/login/oauth2/code/egov-client}
+            scope: openid
+            client-name: egov-client
+        provider:
+          pcpl:
+            issuer-uri:   ${SL_ISSUER_URI:https://srl-dev-auth.prapticonsulting.com}
+            token-uri: ${SL_TOKEN_URI:https://srl-dev-auth.prapticonsulting.com/oauth2/token}
+com:
+  pcpl:
+    carbon:
+      issuerUrl: https://srl-dev-auth.prapticonsulting.com/
+      cssPath: file:///@project.basedir@/res/static/css/
+      imagesPath: file:///@project.basedir@/res/static/images/
+      jsPath: file:///@project.basedir@/res/static/js/
+      jsonPath: file:///@project.basedir@/res/static/json/
+      bowerPath: file:///@project.basedir@/res/static/bower_components/
+      library: file:///@project.basedir@/res/static/library/
+      assets: file:///@project.basedir@/res/static/assets/
+      homeUrl: http://localhost:9204
+
+
+
+
+
+
+
+
+
+
+
