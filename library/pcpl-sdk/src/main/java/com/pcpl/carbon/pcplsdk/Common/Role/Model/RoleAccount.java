@@ -13,7 +13,11 @@ import lombok.NoArgsConstructor;
 public class RoleAccount {
     @Id
     @Column(name = "id")
-    @GeneratedValue
+    // IDENTITY (DB-generated) so the insert doesn't depend on a Hibernate sequence that may not
+    // resolve; cb_role_accounts.id must be GENERATED ... AS IDENTITY to match. Without this the
+    // RoleAccount insert failed on id generation (swallowed by saveRoleAccount's try/catch), so
+    // user role assignments were never persisted.
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "account_id")

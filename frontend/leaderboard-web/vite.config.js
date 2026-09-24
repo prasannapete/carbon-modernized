@@ -4,8 +4,9 @@ import react from '@vitejs/plugin-react';
 // leaderboard-web now authenticates against the LOCAL Carbon Modernized authserver
 // (:9201) like SRL Dashboard and calls kitkat-service (:9204) directly with a Bearer
 // token — it no longer goes through the :9111 session BFF (which redirected to the
-// remote authserver). Dev runs on port 3001 (SRL Dashboard already uses 3000); the
-// srl-analytics client's redirect must include http://localhost:3001/oauth2/callback.
+// remote authserver). Dev runs on port 3002 (SRL Dashboard uses 3000, playMobil uses 3001,
+// so they can all run at once); the srl-analytics client's redirect must include
+// http://localhost:3002/oauth2/callback.
 //
 // Proxies keep the browser same-origin (no CORS):
 //   /api/*        -> kitkat-service (:9204)   (data endpoints; /api prefix stripped)
@@ -17,7 +18,7 @@ const AUTH_TARGET = process.env.VITE_AUTH_URL || 'http://localhost:9201';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3001,
+    port: 3002,
     strictPort: true,
     proxy: {
       '/api': {

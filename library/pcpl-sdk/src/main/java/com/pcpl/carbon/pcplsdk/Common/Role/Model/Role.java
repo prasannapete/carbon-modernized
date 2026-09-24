@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 import org.hibernate.validator.constraints.Length;
 
 import java.util.List;
@@ -18,6 +19,9 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+// Opt in to the reusable tenant row-filter (FilterDef defined on ApplicationModel), enabled
+// per request by each service's TenantInterceptor so reads are scoped to the caller's tenant.
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Role extends ApplicationModel {
     @Column(name = "client_id")
     @Length(max = 40)

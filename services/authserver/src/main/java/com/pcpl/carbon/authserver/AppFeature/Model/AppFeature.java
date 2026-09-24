@@ -25,9 +25,13 @@ import java.util.List;
 public class AppFeature {
     @Id
     @Column(name = "id")
-    @Length(max = 40)
-    @GeneratedValue
+    // IDENTITY to match the cb_app_features.id identity column so the DB generates the id on
+    // insert (a bare @GeneratedValue resolves to a sequence that may not exist, failing the save).
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 
     @Column(name = "feature_name")
     @Length(max = 255)

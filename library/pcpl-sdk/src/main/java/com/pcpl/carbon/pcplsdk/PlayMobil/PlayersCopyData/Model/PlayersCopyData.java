@@ -8,6 +8,7 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedBy;
@@ -23,6 +24,9 @@ import java.util.Date;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+// Opt in to the reusable tenant row-filter (defined on ApplicationModel). Enabled per request
+// by each service's TenantInterceptor so reads are automatically scoped to the caller's tenant.
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PlayersCopyData {
 
     @Id

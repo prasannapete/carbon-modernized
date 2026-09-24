@@ -19,6 +19,7 @@ public class RoleDTO {
     private String description;
     private List<AppFeature> appFeatures;
     private String appFeatureIds;
+    private String tenantId;
 
     public RoleDTO(Long id, String clientId, String name, String homePage, String description, List<AppFeature> appFeatures) {
         this.id = id;

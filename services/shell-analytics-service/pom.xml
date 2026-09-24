@@ -239,6 +239,23 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- JDK 23+ no longer auto-runs classpath processors; opt in explicitly so
+                         Lombok (@Slf4j, @Data, @Builder, ...) is processed by the CLI build.
+                         Without this, `mvn compile` fails with "cannot find symbol" / "log has
+                         private access" and target/classes stays empty. IntelliJ uses its own
+                         Lombok plugin, but a Maven reimport can drop that, so pin it here. -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
 		</plugins>
 	</build>
 

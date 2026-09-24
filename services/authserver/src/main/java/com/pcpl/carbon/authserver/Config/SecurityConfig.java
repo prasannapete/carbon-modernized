@@ -138,14 +138,15 @@ public class SecurityConfig {
                         logout.logoutRequestMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/logout"))
                                 // Default target is the SRL Dashboard (unchanged). A caller may pass
                                 // ?redirect=<url> to return elsewhere after logout, but ONLY for known
-                                // local app origins (localhost:3000/3001) so the Leaderboard Web (:3001)
-                                // can return to its own login instead of the dashboard. Restricting to
-                                // those origins keeps this from being an open redirect.
+                                // local app origins (SRL Dashboard 3000, playMobil 3001, Leaderboard Web
+                                // 3002) so each SPA can return to its own login instead of the dashboard.
+                                // Restricting to those origins keeps this from being an open redirect.
                                 .logoutSuccessHandler((request, response, authentication) -> {
                                     String redirect = request.getParameter("redirect");
                                     String target = (redirect != null
                                             && (redirect.startsWith("http://localhost:3000")
-                                                || redirect.startsWith("http://localhost:3001")))
+                                                || redirect.startsWith("http://localhost:3001")
+                                                || redirect.startsWith("http://localhost:3002")))
                                             ? redirect
                                             : cbConfig.getLoginRedirectURL();
                                     response.sendRedirect(target);

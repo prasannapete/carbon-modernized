@@ -1,5 +1,6 @@
 package com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.User.Service;
 
+import com.pcpl.carbon.pcplsdk.Common.Context.TenantContext;
 import com.pcpl.carbon.pcplsdk.Common.Response.ApplicationResponse;
 import com.pcpl.carbon.pcplsdk.Common.Response.PageResponse;
 import com.pcpl.carbon.pcplsdk.Common.Role.DTO.RoleDTO;
@@ -74,6 +75,14 @@ public class UserServiceImpl extends AbstractLazyService<User, UserDTO, UserRepo
 
     @Override
     public User save(User user) throws Exception {
+        // Stamp the current tenant (from the logged-in user's JWT, via TenantContext) before
+        // saving, so users created/edited by a tenant admin belong to that tenant and appear in
+        // the tenant-filtered lists. Mirrors AbstractCRUDService.applyTenant (this override
+        // otherwise bypasses it). No-op when there is no tenant in context (e.g. super-admin).
+        Long tenantId = TenantContext.getTenantId();
+        if (tenantId != null && user != null) {
+            user.setTenantId(tenantId);
+        }
         return userRepository.save(user);
     }
 

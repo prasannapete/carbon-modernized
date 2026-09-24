@@ -7,9 +7,17 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-public interface AppFeatureRepository  extends JpaRepository<AppFeature, String> {
+public interface AppFeatureRepository  extends JpaRepository<AppFeature, Long> {
+
+    // ---- CRUD / tenant-scoped lookups (soft-delete aware) ----
+    Optional<AppFeature> findByIdAndIsDeleted(Long id, int isDeleted);
+
+    List<AppFeature> findAllByIsDeletedOrderBySequenceAsc(int isDeleted);
+
+    List<AppFeature> findAllByTenantIdAndIsDeletedOrderBySequenceAsc(Long tenantId, int isDeleted);
 
     @Query(
             value = "SELECT new com.pcpl.carbon.authserver.AppFeature.Model.AppFeature(" +
