@@ -1,24 +1,10 @@
-import React, {useEffect, useState} from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { Users, Settings, LogOut,LayoutDashboard } from "lucide-react";
 import '../../css/Dashboard.css';
-import axiosInstance from "../../interceptors";
 
 
 const Navbar = ({ currentPage, onLogout }) => {
-
-    const [isGod,setIsGod] = useState(null);
-
-    const BASE_URL = process.env.REACT_APP_SHELL_ANALYTICS_SERVICE_BASE_URL;
-
-
-    useEffect(() => {
-        const profile = async ()=>{
-            const response = await axiosInstance.post(`${BASE_URL}/user/get-my-profile`);
-            setIsGod(response.data.user.isGod);
-        }
-        profile();
-    },[])
 
     const actions = [
         { key: "users", type: "link", to: "/users", icon: Users, iconClass: "w-10 h-10", label: null, className: "action-link" },
@@ -27,11 +13,9 @@ const Navbar = ({ currentPage, onLogout }) => {
         { key: "logout", type: "button", icon: LogOut, iconClass: "w-4 h-4", label: "Logout", className: "action-link logout-variant" },
 
     ];
-    // Exclude the current page
-    const filteredActions = actions.filter(action => {
-        if (action.key === "users" && isGod !== 1) return false; // only show Users if isGod === 1
-        return action.key !== currentPage;
-    });
+    // Show every action (the Users icon is available to all logged-in users), except the
+    // one for the page currently being viewed.
+    const filteredActions = actions.filter(action => action.key !== currentPage);
     return (
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {filteredActions.map((action, index) => {

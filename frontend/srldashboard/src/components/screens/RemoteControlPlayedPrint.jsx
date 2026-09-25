@@ -73,7 +73,7 @@ const RemoteControlPlayed = ({ startDate, endDate,country,isPrinting}) => {
         }
         return null;
     };
-    if (!data || typeof data.data.graphData !== 'object' || !data.data.grandTotal || !Array.isArray(data.data.summary)) {
+    if (!data || !data.data || typeof data.data.graphData !== 'object' || !data.data.grandTotal || !Array.isArray(data.data.summary)) {
         return <div>Loading...</div>;
     }
     const { graphData, summary, grandTotal } = data.data;

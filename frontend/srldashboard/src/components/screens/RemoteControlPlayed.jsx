@@ -73,8 +73,14 @@ const RemoteControlPlayed = ({ startDate, endDate,country,startLoading, stopLoad
         }
         return null;
     };
-    if (!data || typeof data.data.graphData !== 'object' || !data.data.grandTotal || !Array.isArray(data.data.summary)) {
+    if (!data) {
         return <div>Loading...</div>;
+    }
+    // The API returns data:null when there are no records for the selected filters
+    // (e.g. a country that has no RC-played data yet). Guard data.data before reading
+    // graphData so an empty result shows an empty state instead of crashing the screen.
+    if (!data.data || typeof data.data.graphData !== 'object' || !data.data.grandTotal || !Array.isArray(data.data.summary)) {
+        return <div>No data available for the selected filters.</div>;
     }
     const { graphData, summary, grandTotal } = data.data;
     const colorPalette = [
