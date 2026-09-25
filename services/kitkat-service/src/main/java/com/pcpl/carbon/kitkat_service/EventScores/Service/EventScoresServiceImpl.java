@@ -197,6 +197,11 @@ public class EventScoresServiceImpl extends AbstractLazyService<EventScores, Eve
 
 
             File currDir = new File(pcplConfig.getExcelUploadPath());
+            // Create the upload directory if it doesn't exist yet, so a valid configured path
+            // works even before the folder is manually created (FileOutputStream won't make it).
+            if (!currDir.exists()) {
+                currDir.mkdirs();
+            }
             String path = currDir.getAbsolutePath();
             CellStyle style = workbook.createCellStyle();
             XSSFFont cellFont = workbook.createFont();
@@ -213,12 +218,26 @@ public class EventScoresServiceImpl extends AbstractLazyService<EventScores, Eve
 
 
                 cell = row.createCell(1);
-                cell.setCellValue(eventScoresDTO.getScore());
+                // getScore() is a Double and may be null (time-type events store `time`, or a
+                // participant may have no score yet). setCellValue(double) auto-unboxes and NPEs
+                // on null, so guard it: write the numeric score when present, else the time string,
+                // else blank.
+                if (eventScoresDTO.getScore() != null) {
+                    cell.setCellValue(eventScoresDTO.getScore());
+                } else if (eventScoresDTO.getTime() != null) {
+                    cell.setCellValue(eventScoresDTO.getTime());
+                } else {
+                    cell.setCellValue("");
+                }
                 cell.setCellStyle(style);
             }
 
-            String fileLocation = path+"/"+ String.valueOf(System.nanoTime())+ "_score.xlsx";
-            eventScoresResponse.setExcelUploadPath(fileLocation);
+            // Write the workbook into FILE_UPLOAD_PATH but hand the browser a servable URL
+            // (through the /api proxy -> kitkat) instead of the server filesystem path, which the
+            // browser cannot navigate to. The file is served by GET /carbon-events/files/{name}.
+            String fileName = System.nanoTime() + "_score.xlsx";
+            String fileLocation = path + "/" + fileName;
+            eventScoresResponse.setExcelUploadPath("/api/carbon-events/files/" + fileName);
             FileOutputStream outputStream = new FileOutputStream(fileLocation);
             workbook.write(outputStream);
             workbook.close();

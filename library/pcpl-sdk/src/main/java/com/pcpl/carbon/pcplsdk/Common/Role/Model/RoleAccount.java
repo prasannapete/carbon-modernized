@@ -25,7 +25,4 @@ public class RoleAccount {
 
     @Column(name = "role_id")
     private Long roleId;
-
-    @Column(name = "tenant_id")
-    private Long tenantId;
 }

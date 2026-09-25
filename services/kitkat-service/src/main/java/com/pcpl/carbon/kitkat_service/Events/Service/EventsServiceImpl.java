@@ -98,6 +98,31 @@ public class EventsServiceImpl extends AbstractLazyService<Events, EventsDTO, Ev
         return eventsResponse;
     }
 
+    // All non-deleted events (management list) regardless of isLive / date window.
+    // Uses the same DTO-constructor mapping as getDeleted()/getAllEvents() so it is
+    // independent of the generic /all (ModelMapper) path. Newest first.
+    @Override
+    public EventsResponse getAllEventsList() throws Exception {
+        logger.trace("Entering");
+        EventsResponse eventsResponse = new EventsResponse();
+        try {
+            Sort sort = Sort.by(Sort.Direction.DESC, "creationTime");
+            List<EventsDTO> eventsDTOS = getEventDTOS(eventsRepository.findAllByIsDeleted(0, sort));
+            eventsResponse.setData(eventsDTOS);
+            eventsResponse.setRecordsTotal(eventsDTOS.size());
+            eventsResponse.setRecordsFiltered(eventsDTOS.size());
+            eventsResponse.setSuccess(true);
+            eventsResponse.setError("");
+            logger.trace("Completed Successfully");
+        } catch (Exception ex) {
+            logger.error(ex.getMessage(), ex);
+            eventsResponse.setSuccess(false);
+            eventsResponse.setError(ex.getMessage());
+        }
+        logger.trace("Exiting");
+        return eventsResponse;
+    }
+
     @Override
     public EventsResponse getLeaderboardEvents(Map<String, String> formData) throws Exception {
         logger.trace("Entering");

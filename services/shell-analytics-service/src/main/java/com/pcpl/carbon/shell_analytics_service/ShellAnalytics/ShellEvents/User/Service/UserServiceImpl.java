@@ -6,6 +6,7 @@ import com.pcpl.carbon.pcplsdk.Common.Response.PageResponse;
 import com.pcpl.carbon.pcplsdk.Common.Role.DTO.RoleDTO;
 import com.pcpl.carbon.pcplsdk.Common.Role.Model.Role;
 import com.pcpl.carbon.pcplsdk.Common.Role.Model.RoleAccount;
+import com.pcpl.carbon.pcplsdk.Common.Role.Response.RoleAccountResponse;
 import com.pcpl.carbon.pcplsdk.Common.User.DTO.UserDTO;
 import com.pcpl.carbon.pcplsdk.Common.User.Model.User;
 import com.pcpl.carbon.pcplsdk.Common.User.Response.UserResponse;
@@ -198,12 +199,40 @@ public class UserServiceImpl extends AbstractLazyService<User, UserDTO, UserRepo
                 List<Role> roles = user.getRoles();
                 user.setRoles(null);
 
-                User user1 = this.save(user);
+                // Editing an existing user merges the User whose EAGER `roles` collection is subject
+                // to the Role tenant @Filter. Hibernate refuses to recreate a filtered collection
+                // ("cannot recreate collection while filter is enabled"), so temporarily disable the
+                // tenant filter for just this save, then restore it. Roles are managed separately via
+                // RoleAccount below, so the disabled filter does not affect role scoping.
+                org.hibernate.Session session = entityManager.unwrap(org.hibernate.Session.class);
+                boolean tenantFilterEnabled = session.getEnabledFilter("tenantFilter") != null;
+                if (tenantFilterEnabled) {
+                    session.disableFilter("tenantFilter");
+                }
+                User user1;
+                try {
+                    user1 = this.save(user);
+                } finally {
+                    Long currentTenantId = TenantContext.getTenantId();
+                    if (tenantFilterEnabled && currentTenantId != null) {
+                        session.enableFilter("tenantFilter").setParameter("tenantId", currentTenantId);
+                    }
+                }
                 UserDTO userDTO = convertEntityToDto(user1);
 
                 if (userDTO != null) {
                     if (isNewUser == 1) {
-                        mailClient.sendInviteUserEmail(user1);
+                        // Sending the invite email must not abort user creation / role assignment.
+                        // The invite template ("user-invitation") may be missing/unresolvable, which
+                        // previously threw here (before the role save ran), so creating a new user
+                        // with a role failed entirely while editing an existing user worked. Treat a
+                        // mail failure as non-fatal: the user (and role) are still saved.
+                        try {
+                            mailClient.sendInviteUserEmail(user1);
+                        } catch (Exception mailEx) {
+                            log.error("Failed to send invite email to new user {}: {}",
+                                    user1.getUserName(), mailEx.getMessage(), mailEx);
+                        }
                     }
                 }
 
@@ -211,7 +240,15 @@ public class UserServiceImpl extends AbstractLazyService<User, UserDTO, UserRepo
                     RoleAccount roleAccount = new RoleAccount();
                     roleAccount.setAccountId(user1.getId());
                     roleAccount.setRoleId(roles.get(0).getId());
-                    roleAccountService.saveRoleAccount(roleAccount);
+                    // Do NOT swallow a failed role assignment: previously the exception was only
+                    // logged inside saveRoleAccount and ignored here, so the API returned
+                    // success=true while the cb_role_accounts insert had actually failed (the
+                    // saved user then showed "No Role"). Surface it so the real cause is visible.
+                    RoleAccountResponse roleAccountResponse = roleAccountService.saveRoleAccount(roleAccount);
+                    if (roleAccountResponse == null || !roleAccountResponse.isSuccess()) {
+                        String reason = roleAccountResponse != null ? roleAccountResponse.getError() : "unknown error";
+                        throw new Exception("Failed to save user role assignment: " + reason);
+                    }
                 }
 
                 entityManager.clear();

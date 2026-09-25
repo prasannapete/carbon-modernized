@@ -13,7 +13,9 @@ public interface EventsService {
     EventsResponse getDeleted() throws Exception;
 
     EventsResponse getAllEvents() throws Exception;
-    
+
+    EventsResponse getAllEventsList() throws Exception;
+
     EventsResponse getLeaderboardEvents(Map<String,String> formData) throws Exception;
 
     EventsResponse moveToTrash(Map<String, String> formData) throws Exception;

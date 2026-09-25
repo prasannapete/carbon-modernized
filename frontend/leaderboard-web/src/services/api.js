@@ -9,12 +9,15 @@ import { getToken, requireLogin } from '../lib/auth';
 // translation here means the page components are unchanged.
 
 // ---- low-level kitkat call (via /api proxy -> :9204), with Bearer + 401 handling ----
-async function kitkat(method, path, { json } = {}) {
+async function kitkat(method, path, { json, formData } = {}) {
   const headers = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const opts = { method, headers };
-  if (json !== undefined) {
+  if (formData !== undefined) {
+    // Multipart: let the browser set Content-Type (with the multipart boundary).
+    opts.body = formData;
+  } else if (json !== undefined) {
     headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(json);
   }
@@ -34,19 +37,7 @@ async function kitkat(method, path, { json } = {}) {
   try { return JSON.parse(text); } catch { return text; }
 }
 
-// kitkat pagination/sort keys differ from the BFF's DataTables params.
-function pageBody(params, extra = {}) {
-  const sortField = params['order[0][column]'] || params.sort || 'creationTime';
-  const sortOrder = params['order[0][dir]'] || 'asc';
-  return {
-    current_page: '0',
-    page_size: String(params.length ?? 25),
-    sort_field: sortField || 'creationTime',
-    sort_order: sortOrder || 'asc',
-    ...extra,
-  };
-}
-
+// Client-side sort for the admin event list (the whole list loads at once).
 function sortEvents(list, params) {
   const field = params['order[0][column]'] || params.sort;
   const dir = params['order[0][dir]'] || 'asc';
@@ -64,12 +55,31 @@ function sortEvents(list, params) {
   return sorted;
 }
 
+// kitkat pagination/sort keys differ from the BFF's DataTables params.
+function pageBody(params, extra = {}) {
+  const sortField = params['order[0][column]'] || params.sort || 'creationTime';
+  const sortOrder = params['order[0][dir]'] || 'asc';
+  return {
+    current_page: '0',
+    page_size: String(params.length ?? 25),
+    sort_field: sortField || 'creationTime',
+    sort_order: sortOrder || 'asc',
+    ...extra,
+  };
+}
+
 // ---- translations keyed by the BFF path the pages call ----
 const handlers = {
   // Events
+  // Public/live events only (isLive=1 & currently within date range): used by the
+  // Header events dropdown, the leaderboard carousel and the score-display screen.
   '/events/get-all': () => kitkat('POST', '/carbon-events/get-all-events'),
+  // Admin management list: ALL non-deleted events regardless of isLive or end date
+  // (matches the original app's /get-events). Uses the dedicated kitkat
+  // /carbon-events/get-events, which returns every non-deleted event as a flat list
+  // (independent of the live-only /get-all-events feed). Sorted client-side.
   '/events/get-events': async (params) => {
-    const resp = await kitkat('POST', '/carbon-events/get-all-events');
+    const resp = await kitkat('POST', '/carbon-events/get-events');
     const list = (resp && resp.data) || [];
     const sorted = sortEvents(list, params);
     return { success: true, recordsFiltered: sorted.length, recordsTotal: sorted.length, data: { data: sorted } };
@@ -95,8 +105,9 @@ const handlers = {
       json: { current_page: '0', page_size: String(params.length ?? 10) },
     }),
   '/events/keep-session': () => kitkat('POST', '/carbon-events/keep-session'),
-  // Logo upload has no kitkat equivalent (the BFF handled S3 uploads itself).
-  '/events/upload-logo': () => Promise.reject(new Error('logo upload is not available on kitkat-service')),
+  // Logo upload: multipart POST to kitkat, which stores the file and returns a servable
+  // URL. Response is a list ([{success, excelUploadPath}]) matching the original BFF shape.
+  '/events/upload-logo': (formData) => kitkat('POST', '/carbon-events/upload-logo', { formData }),
 
   // Event participants
   '/event-participants/save': (dto) => kitkat('POST', '/carbon-event-participants/save', {
@@ -160,7 +171,7 @@ export function postForm(url, params = {}) {
 export function postJson(url, obj) {
   return dispatch(url, obj);
 }
-export function postMultipart(url) {
-  // Only /events/upload-logo used this; kitkat has no upload endpoint.
-  return dispatch(url, {});
+export function postMultipart(url, formData) {
+  // Used by /events/upload-logo: forwards the FormData to the kitkat upload endpoint.
+  return dispatch(url, formData);
 }

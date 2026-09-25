@@ -32,6 +32,9 @@ export default function EventUI() {
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef(null);
 
+  // Earliest selectable date is today: the date pickers must not allow past dates.
+  const todayStr = moment().format(GLOBAL_DATE_FORMAT);
+
   useEffect(() => {
     if (id !== '') {
       postForm('/events/get', { id })
@@ -191,7 +194,7 @@ export default function EventUI() {
                   <label className="purchase-analytics-title">Start date</label>
                   <div className="input-append purchase-analytics-value" id="eventStartDate">
                     <input autoComplete="off" className="events-input-date" id="startDate" name="startDateStr"
-                           type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                           type="date" min={todayStr} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                     <span className="add-on right-align-icon">
                       <img className="calender-img" style={{ cursor: 'pointer' }} src="/images/icons/calender-logo.svg" />
                     </span>
@@ -204,7 +207,7 @@ export default function EventUI() {
                   <label className="purchase-analytics-title">End date</label>
                   <div className="input-append purchase-analytics-value" id="eventEndDate">
                     <input autoComplete="off" className="events-input-date" id="endDate" name="endDateStr"
-                           type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                           type="date" min={startDate || todayStr} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                     <span className="add-on right-align-icon">
                       <img className="calender-img" style={{ cursor: 'pointer' }} src="/images/icons/calender-logo.svg" />
                     </span>

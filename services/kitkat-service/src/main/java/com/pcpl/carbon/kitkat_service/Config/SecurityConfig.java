@@ -21,7 +21,10 @@ public class SecurityConfig {
             "/carbon-events/get-leader-board-events",
             "/carbon-events/keep-session",
             "/events/kk-race-played/race-info",
-            "/carbon-events/get-all-events"
+            "/carbon-events/get-all-events",
+            // Uploaded logos / generated excel files are fetched by <img> tags and download
+            // navigations that carry no Authorization header, so serving must be public.
+            "/carbon-events/files/**"
     };
 
     // The Leaderboard Web's leaderboard data API. Exposed fully publicly (no login)
