@@ -16,6 +16,17 @@ export default function App() {
     <Routes>
       {/* OAuth2 authorization-code callback (outside the app shell, not gated) */}
       <Route path="/oauth2/callback" element={<AuthCallback />} />
+
+      <Route element={<Layout />}>
+        <Route path="/events/display-leader-board" element={<LeaderBoard />} />
+        <Route path="/event-scores/event-display-score" element={<LeaderBoard />} />
+        <Route path="/event-scores/single-event-display-score" element={<EventDisplayScore />} />
+        <Route path="/event-scores/single-event-display-score/:id" element={<EventDisplayScore />} />
+        <Route path="/kk-race-played/leader-board" element={<KkRaceLeaderBoard />} />
+        <Route path="/kk-race-played/leader-board/:consoleId" element={<KkRaceLeaderBoard />} />
+      </Route>
+
+      {/* PROTECTED management screens — unchanged: still gated behind RequireAuth (login). */}
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/" element={<Navigate to="/events/list" replace />} />
         <Route path="/events/list" element={<EventList />} />
@@ -23,14 +34,8 @@ export default function App() {
         <Route path="/events/create-event/:id" element={<EventUI />} />
         <Route path="/events/update-score" element={<UpdateScore />} />
         <Route path="/events/update-score/:eventId" element={<UpdateScore />} />
-        <Route path="/events/display-leader-board" element={<LeaderBoard />} />
-        <Route path="/event-scores/event-display-score" element={<LeaderBoard />} />
-        <Route path="/event-scores/single-event-display-score" element={<EventDisplayScore />} />
-        <Route path="/event-scores/single-event-display-score/:id" element={<EventDisplayScore />} />
         <Route path="/event-participants/new-participant" element={<AddParticipant />} />
         <Route path="/event-participants/new-participant/:id" element={<AddParticipant />} />
-        <Route path="/kk-race-played/leader-board" element={<KkRaceLeaderBoard />} />
-        <Route path="/kk-race-played/leader-board/:consoleId" element={<KkRaceLeaderBoard />} />
         <Route path="*" element={<Navigate to="/events/list" replace />} />
       </Route>
     </Routes>
