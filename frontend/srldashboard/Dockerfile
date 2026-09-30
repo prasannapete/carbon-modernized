@@ -1,5 +1,5 @@
 FROM --platform=linux/amd64  node:lts
-LABEL authors="telwyn"
+LABEL authors="sharanya"
 EXPOSE 3000
 
 WORKDIR /carbon

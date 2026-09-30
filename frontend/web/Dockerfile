@@ -1,16 +1,16 @@
 FROM --platform=linux/amd64  node:lts
 LABEL authors="sharanya"
-EXPOSE 3001
+EXPOSE 5173
 
 WORKDIR /carbon
 ADD  package-prod.json /carbon/package.json
-ADD  .env-prod /carbon/.env
+ADD  .env /carbon/.env
 RUN npm install --legacy-peer-deps
 COPY . .
 
 ENV DISABLE_ESLINT_PLUGIN=true
 RUN CI=true npm run build
-ENTRYPOINT ["npm", "start"]
+ENTRYPOINT ["npm","run","dev"]
 
 
 # Runtime stage

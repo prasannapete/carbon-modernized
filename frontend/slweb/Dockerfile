@@ -1,5 +1,5 @@
-FROM --platform=linux/amd64 openjdk:21-jdk
-LABEL maintainer="telwyn@prapticonsulting.com"
+FROM --platform=linux/amd64 openjdk:25-jdk
+LABEL maintainer="sharanya@prapticonsulting.com"
 VOLUME /tmp
 EXPOSE 9205
 COPY res /res

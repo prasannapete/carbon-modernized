@@ -1,6 +1,6 @@
 FROM --platform=linux/amd64  node:lts
 LABEL authors="sharanya"
-EXPOSE 3001
+EXPOSE 3002
 
 WORKDIR /carbon
 ADD  package-prod.json /carbon/package.json
@@ -10,7 +10,7 @@ COPY . .
 
 ENV DISABLE_ESLINT_PLUGIN=true
 RUN CI=true npm run build
-ENTRYPOINT ["npm", "start"]
+ENTRYPOINT ["npm","run" ,"dev"]
 
 
 # Runtime stage
