@@ -13,7 +13,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import java.util.Date;
 
 @Entity
-@Table(name = "cb_schema_metadata")
+@Table(name = "schema_metadata")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

@@ -10,7 +10,7 @@ import lombok.ToString;
 import java.io.Serializable;
 
 @Entity
-@Table(name = "cb_role_grants")
+@Table(name = "srl_role_grants")
 @Getter
 @Setter
 @ToString

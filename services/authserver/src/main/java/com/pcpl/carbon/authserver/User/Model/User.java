@@ -16,7 +16,7 @@ import java.util.Date;
 
 
 @Entity
-@Table(name = "cb_user")
+@Table(name = "srl_user")
 @Getter
 @Setter
 @ToString

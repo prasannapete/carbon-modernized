@@ -8,7 +8,7 @@ import lombok.*;
 import org.hibernate.annotations.Filter;
 
 @Entity
-@Table(name = "cb_carbon_event_scores")
+@Table(name = "carbon_event_scores")
 @Data
 @RequiredArgsConstructor
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")

@@ -15,7 +15,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 @Entity
-@Table(name = "cb_roles")
+@Table(name = "srl_roles")
 @Getter
 @Setter
 @ToString

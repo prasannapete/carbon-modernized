@@ -11,7 +11,7 @@ import lombok.ToString;
 import java.io.Serializable;
 
 @Entity
-@Table(name = "cb_role_accounts")
+@Table(name = "srl_role_accounts")
 @Getter
 @Setter
 @ToString

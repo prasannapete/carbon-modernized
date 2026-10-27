@@ -20,7 +20,7 @@ import java.time.LocalDate;
 import java.util.Date;
 
 @Entity
-@Table(name = "cb_players_copy_data")
+@Table(name = "players_copy_data")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

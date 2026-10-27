@@ -15,7 +15,7 @@ import org.hibernate.validator.constraints.Length;
 import java.util.List;
 
 @Entity
-@Table(name = "cb_roles")
+@Table(name = "srl_roles")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -46,7 +46,7 @@ public class Role extends ApplicationModel {
     private String description;
 
     @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "cb_role_grants",
+    @JoinTable(name = "srl_role_grants",
             joinColumns = {
                     @JoinColumn(name = "role_id", referencedColumnName = "id")
             },

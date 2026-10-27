@@ -64,7 +64,7 @@ public interface RCPlayedRepository extends PCPLCRUDRepository<RCPlayed> {
                                                             FROM CarUnlocked cu
                                                             Where cu.carName IN (SELECT mc2.carName
                                                                                   FROM MasterCars mc2
-                                                                                  WHERE mc2.countryCode IN ((:countries))
+                                                                                  WHERE mc2.countryCode IN (:countries)
                                                                                     and mc2.isActive = 1
                                                                                     AND mc2.isDeleted = 0)
                                                               And cu.gameId = r.gameId

@@ -16,7 +16,7 @@ public interface PlayStoreReportRepository extends PCPLCRUDRepository<PlayStoreR
             "LEFT JOIN Country country ON salesReport.countryCode = country.country and country.isDeleted=0 "+
             "WHERE salesReport.date BETWEEN :startDate AND :endDate  AND salesReport.isDeleted = 0" +
             "AND (:countries IS NULL OR salesReport.countryCode IN :countries) "+
-            "GROUP BY salesReport.countryCode,month(salesReport.date), year(salesReport.date),country.countryName " +
+            "GROUP BY salesReport.countryCode,salesReport.tenantId,month(salesReport.date), year(salesReport.date),country.countryName " +
             "ORDER BY salesReport.countryCode,month(salesReport.date), year(salesReport.date)")
     List<PlayStoreReportGraphDTO> getPlayStoreReport(
             @Param("startDate") Date startDate,

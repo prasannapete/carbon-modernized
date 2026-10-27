@@ -15,7 +15,7 @@ import org.hibernate.validator.constraints.Length;
 import java.util.Date;
 
 @Entity
-@Table(name = "cb_tenant")
+@Table(name = "srl_tenant")
 @Getter
 @Setter
 @ToString

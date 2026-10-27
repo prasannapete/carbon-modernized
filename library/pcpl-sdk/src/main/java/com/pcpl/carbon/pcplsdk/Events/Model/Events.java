@@ -10,7 +10,7 @@ import org.hibernate.annotations.Filter;
 import java.util.Date;
 
 @Entity
-@Table(name = "cb_carbon_events")
+@Table(name = "carbon_events")
 @Data
 @RequiredArgsConstructor
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")

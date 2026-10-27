@@ -52,7 +52,7 @@ SELECT al.country,
                                                        FROM srl_car_unlocked cu
                                                        Where cu.car_name IN (SELECT mc2.car_name
                                                                              FROM srl_master_cars mc2
-                                                                             WHERE mc2.country_code IN ((:countries))
+                                                                             WHERE mc2.country_code IN (:countries)
                                                                                and mc2.is_active = 1
                                                                                AND mc2.is_deleted = 0)
                                                          And cu.game_id = al.game_id
@@ -70,7 +70,7 @@ WHERE al.is_deleted = 0
                      FROM srl_car_unlocked cu
                      Where cu.car_name IN (SELECT mc2.car_name
                                            FROM srl_master_cars mc2
-                                           WHERE mc2.country_code IN ((:countries))
+                                           WHERE mc2.country_code IN (:countries)
                                              and mc2.is_active = 1
                                              AND mc2.is_deleted = 0)
                        and cu.is_deleted = 0

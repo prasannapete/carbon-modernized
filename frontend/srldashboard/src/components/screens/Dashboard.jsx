@@ -324,7 +324,7 @@ const handlePrint = useReactToPrint({
             <div style={{display:'none'}}>
             <div ref={printRef} className="dashboard-content printable-dashboard-content">
 
-                                {filters.printCountry &&
+                                {filters.isPrinting && filters.printCountry &&
                                   filters.printCountry.split(',').map((code, index) => (
                                       <span key={index} className="country-chip">
                                         <div>

@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 @Entity
-@Table(name = "cb_player_feature_mapping")
+@Table(name = "player_feature_mapping")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

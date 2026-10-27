@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "cb_app_features")
+@Table(name = "srl_app_features")
 @Getter
 @Setter
 @ToString
