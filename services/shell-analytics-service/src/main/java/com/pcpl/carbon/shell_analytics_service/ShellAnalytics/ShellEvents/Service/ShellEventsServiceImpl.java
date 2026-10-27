@@ -63,6 +63,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
@@ -460,7 +462,9 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
 
     @Override
-    public ApplicationResponse exportMultiTabExcel(HttpServletResponse response, String startDate, String endDate, String country) throws Exception {
+    public ApplicationResponse exportMultiTabExcel(HttpServletResponse response, String startDate, String endDate, String country, String reportType) throws Exception {
+
+        boolean weekly = "weekly".equalsIgnoreCase(reportType);
 
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
 
@@ -469,56 +473,63 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             formData.put("endDate", endDate);
             formData.put("country", (country != null && !country.trim().isEmpty()) ? country.trim() : "");
 
-            // Gather every dashboard dataset once (same services the dashboard screen uses),
-            // then split each one per country so every country gets its own worksheet.
-            List<Map<String, Object>> appLaunch = listFromResponse(appLaunchedService.getCountryWiseData(formData), "summaryTable");
-            List<Map<String, Object>> brandViews = listFromResponse(brandViewedGarageService.getCountryWiseData(formData), "summaryTable");
-            List<Map<String, Object>> averages = listFromResponse(carUnlockedService.getCountryWiseAverages(formData), null);
-            List<Map<String, Object>> carsUnlocked = listFromResponse(carUnlockedService.getCarUnlockedData(formData), "summary");
-            List<Map<String, Object>> rcPlayed = listFromResponse(rcPlayedService.getCountryWiseData(formData), "summary");
-            List<Map<String, Object>> racePlayed = listFromResponse(racePlayedService.getCountryWiseData(formData), "summary");
-            Map<String, List<Map<String, Object>>> appStore = graphFromResponse(appStoreSalesServiceImpl.fetchAppStoreSalesReport(formData));
-            Map<String, List<Map<String, Object>>> playStore = graphFromResponse(playStoreReportServiceImpl.fetchPlayStoreSalesReport(formData));
+            // Full-range data (same services the dashboard uses) – provides the all-time Cumulative
+            // column and the master list of countries. Used by both report types.
+            DataBundle full = gather(formData);
 
             // Ordered master list of countries (code -> display name), driven by the averages dataset
             // and back-filled from any other dataset that references a country the averages missed.
             LinkedHashMap<String, String> countries = new LinkedHashMap<>();
-            for (Map<String, Object> a : averages) {
+            for (Map<String, Object> a : full.averages) {
                 String code = str(a.get("countryCode"));
                 String name = str(a.get("countryName"));
                 if (code != null && !code.isEmpty()) {
                     countries.putIfAbsent(code, (name != null && !name.isEmpty()) ? name : code);
                 }
             }
-            collectCountries(countries, carsUnlocked);
-            collectCountries(countries, rcPlayed);
-            collectCountries(countries, racePlayed);
-            for (Map.Entry<String, List<Map<String, Object>>> e : appStore.entrySet()) {
+            collectCountries(countries, full.cars);
+            collectCountries(countries, full.rc);
+            collectCountries(countries, full.race);
+            for (Map.Entry<String, List<Map<String, Object>>> e : full.appStore.entrySet()) {
                 countries.putIfAbsent(e.getKey(), storeCountryName(e.getValue(), e.getKey()));
             }
-            for (Map.Entry<String, List<Map<String, Object>>> e : playStore.entrySet()) {
+            for (Map.Entry<String, List<Map<String, Object>>> e : full.playStore.entrySet()) {
                 countries.putIfAbsent(e.getKey(), storeCountryName(e.getValue(), e.getKey()));
+            }
+
+            // For the Weekly report only: one data bundle per week in the range (each scoped to that
+            // week's dates, so the weekly columns are calculated exactly like the dashboard's range totals).
+            List<Week> weeks = weekly ? computeWeeks(startDate, endDate) : Collections.emptyList();
+            List<DataBundle> weeklyData = new ArrayList<>();
+            if (weekly) {
+                for (Week w : weeks) {
+                    Map<String, String> wf = new HashMap<>();
+                    wf.put("startDate", w.start());
+                    wf.put("endDate", w.end());
+                    wf.put("country", formData.get("country"));
+                    weeklyData.add(gather(wf));
+                }
             }
 
             Map<String, XSSFCellStyle> styles = buildStyles(workbook);
             String period = formatPeriod(startDate) + " TILL " + formatPeriod(endDate);
 
-            if (countries.isEmpty()) {
+            if (countries.isEmpty() || (weekly && weeks.isEmpty())) {
                 // No data for any country: still return a valid, openable workbook.
                 XSSFSheet sheet = workbook.createSheet("DASHBOARD");
                 sheet.setDisplayGridlines(false);
-                applyColumnWidths(sheet);
                 fillRow(sheet, 0, 0, 15, styles.get("title"));
                 put(sheet, 0, 0, "REPORT - " + period, styles.get("title"));
                 sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 15));
             } else {
                 Set<String> usedNames = new HashSet<>();
                 for (Map.Entry<String, String> c : countries.entrySet()) {
-                    String code = c.getKey();
-                    String name = c.getValue();
-                    buildCountrySheet(workbook, styles, uniqueSheetName(usedNames, name), period, code, name,
-                            appLaunch, brandViews, averages, carsUnlocked, rcPlayed, racePlayed,
-                            appStore.get(code), playStore.get(code));
+                    String sheetName = uniqueSheetName(usedNames, c.getValue());
+                    if (weekly) {
+                        buildWeeklySheet(workbook, styles, sheetName, period, c.getKey(), c.getValue(), weeks, weeklyData, full);
+                    } else {
+                        buildStandardSheet(workbook, styles, sheetName, period, c.getKey(), c.getValue(), full);
+                    }
                 }
             }
 
@@ -545,51 +556,185 @@ public class ShellEventsServiceImpl implements ShellEventsService{
     //  Cars Unlocked, Remote Control Played, Race Played, Store Performance), populated dynamically.
     // ---------------------------------------------------------------------------------------------
 
-    private static final int LAST_COL = 15;              // column P – banners span A..P
-    private static final int CAT_COL = 1, LW_COL = 2, CUM_COL = 3; // car tables: name | Last week | Cumulative
+    private static final int CAT_COL = 1;                // car-name column (B) – chart categories
     private static final int CHART_ROWS = 15;            // rows a chart spans; each section advances past this so charts never overlap
 
-    private void buildCountrySheet(XSSFWorkbook wb, Map<String, XSSFCellStyle> s, String sheetName,
-                                   String period, String code, String name,
-                                   List<Map<String, Object>> appLaunch, List<Map<String, Object>> brandViews,
-                                   List<Map<String, Object>> averages, List<Map<String, Object>> carsUnlocked,
-                                   List<Map<String, Object>> rcPlayed, List<Map<String, Object>> racePlayed,
-                                   List<Map<String, Object>> appStore, List<Map<String, Object>> playStore) {
+    private void buildWeeklySheet(XSSFWorkbook wb, Map<String, XSSFCellStyle> s, String sheetName, String period,
+                                   String code, String name, List<Week> weeks,
+                                   List<DataBundle> weekly, DataBundle full) {
+
+        int nw = weeks.size();
+        // Column geometry: three side-by-side tables + a Period box. Each table is
+        // 1 label column + nw weekly columns + 1 Cumulative column, with a one-column gap between.
+        int tw = nw + 2;
+        int appC0 = 1;
+        int brandC0 = appC0 + tw + 1;
+        int usersC0 = brandC0 + tw + 1;
+        int periodC0 = usersC0 + tw + 1;
+        int lastCol = periodC0 + nw + 1; // right edge of the Period box = banner width
 
         XSSFSheet sheet = wb.createSheet(sheetName);
         sheet.setDisplayGridlines(false); // clean, template-style look (no default Excel gridlines)
-        applyColumnWidths(sheet);
+        applyColumnWidths(sheet, lastCol, periodC0);
         XSSFDrawing drawing = sheet.createDrawingPatriarch();
 
-        // Row 0 – report title banner (merged A..P; text lives in the merge anchor, column A).
-        fillRow(sheet, 0, 0, LAST_COL, s.get("title"));
+        // Row 0 – report title banner (text lives in the merge anchor, column A).
+        fillRow(sheet, 0, 0, lastCol, s.get("title"));
         put(sheet, 0, 0, "REPORT - " + period, s.get("title"));
-        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, LAST_COL));
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, lastCol));
         sheet.getRow(0).setHeightInPoints(34);
+        fillRow(sheet, 1, 0, lastCol, s.get("bandBig"));
 
-        // Row 1 – decorative orange band.
-        fillRow(sheet, 1, 0, LAST_COL, s.get("bandBig"));
+        // Rows 3-6 – App Launches / Brand Views / Users tables + the "Period" KPI box.
+        labelCell(sheet, 3, appC0, appC0 + tw - 1, "APP LAUNCHES", s.get("yellowLabel"));
+        labelCell(sheet, 3, brandC0, brandC0 + tw - 1, "BRAND VIEWS", s.get("yellowLabel"));
+        labelCell(sheet, 3, usersC0, usersC0 + tw - 1, "USERS", s.get("yellowLabel"));
+        put(sheet, 3, periodC0, "Period", s.get("periodHdr"));
+        for (int i = 0; i < nw; i++) put(sheet, 3, periodC0 + 1 + i, weeks.get(i).label(), s.get("hdrRight"));
+        put(sheet, 3, periodC0 + 1 + nw, "Cumulative", s.get("hdrRight"));
 
-        // Rows 3-6 – App Launches / Brand Views / Users summary tables + the "Period" KPI box.
-        Map<String, Object> app = findRow(appLaunch, code, name);
-        Map<String, Object> brand = findRow(brandViews, code, name);
-        Map<String, Object> avg = findRow(averages, code, name);
+        summaryHeader(sheet, 4, appC0, weeks, s);
+        summaryHeader(sheet, 4, brandC0, weeks, s);
+        summaryHeader(sheet, 4, usersC0, weeks, s);
 
-        // group labels
+        // Per-week values for the three top tables + the Cars/RC/Race grand totals (used by the KPI box).
+        double[] appWk = new double[nw], brandWk = new double[nw], usersWk = new double[nw];
+        double[] carsGT = new double[nw], rcGT = new double[nw], raceGT = new double[nw];
+        for (int i = 0; i < nw; i++) {
+            DataBundle b = weekly.get(i);
+            appWk[i]   = toDouble(findRow(b.appLaunch, code, name).get("launches"));
+            brandWk[i] = toDouble(findRow(b.brand, code, name).get("views"));
+            usersWk[i] = toDouble(findRow(b.averages, code, name).get("totalUsers"));
+            carsGT[i]  = sumField(filterByCountry(b.cars, code, name), "unlocked");
+            rcGT[i]    = roundSumField(filterByCountry(b.rc, code, name), "totalRcDuration");
+            raceGT[i]  = roundSumField(filterByCountry(b.race, code, name), "totalRcDuration");
+        }
+        double appCum   = toDouble(findRow(full.appLaunch, code, name).get("cumulative"));
+        double brandCum = toDouble(findRow(full.brand, code, name).get("cumulative"));
+        double usersCum = toDouble(findRow(full.averages, code, name).get("cummulativeUsers"));
+
+        put(sheet, 5, appC0, name, s.get("ctyName"));
+        weekRow(sheet, 5, appC0, appWk, appCum, s.get("num"));
+        put(sheet, 5, brandC0, name, s.get("ctyName"));
+        weekRow(sheet, 5, brandC0, brandWk, brandCum, s.get("num"));
+        put(sheet, 5, usersC0, name, s.get("ctyName"));
+        weekRow(sheet, 5, usersC0, usersWk, usersCum, s.get("num"));
+
+        put(sheet, 6, appC0, "Grand Total", s.get("gtLabel"));
+        weekRow(sheet, 6, appC0, appWk, appCum, s.get("gtNum"));
+        put(sheet, 6, brandC0, "Grand Total", s.get("gtLabel"));
+        weekRow(sheet, 6, brandC0, brandWk, brandCum, s.get("gtNum"));
+        put(sheet, 6, usersC0, "Grand Total", s.get("gtLabel"));
+        weekRow(sheet, 6, usersC0, usersWk, usersCum, s.get("gtNum"));
+
+        // Period KPI box – one value per week + Cumulative.
+        double carsCum = sumField(filterByCountry(full.cars, code, name), "cumulative");
+        double rcCum   = roundSumField(filterByCountry(full.rc, code, name), "cumulativeRcDuration");
+        double raceCum = roundSumField(filterByCountry(full.race, code, name), "cumulativeRcDuration");
+        put(sheet, 4, periodC0, "Average Cars Per Users", s.get("periodHdr"));
+        put(sheet, 5, periodC0, "Average Remote Control Played", s.get("periodHdr"));
+        put(sheet, 6, periodC0, "Average Race Played", s.get("periodHdr"));
+        for (int i = 0; i < nw; i++) {
+            int c = periodC0 + 1 + i;
+            put(sheet, 4, c, usersWk[i] > 0 ? fmt2(carsGT[i] / usersWk[i]) : "", s.get("kpiVal"));
+            put(sheet, 5, c, usersWk[i] > 0 ? formatDuration(rcGT[i] / usersWk[i]) : "", s.get("kpiVal"));
+            put(sheet, 6, c, usersWk[i] > 0 ? formatDuration(raceGT[i] / usersWk[i]) : "", s.get("kpiVal"));
+        }
+        int pc = periodC0 + 1 + nw;
+        put(sheet, 4, pc, usersCum > 0 ? fmt2(carsCum / usersCum) : "", s.get("kpiVal"));
+        put(sheet, 5, pc, usersCum > 0 ? formatDuration(rcCum / usersCum) : "", s.get("kpiVal"));
+        put(sheet, 6, pc, usersCum > 0 ? formatDuration(raceCum / usersCum) : "", s.get("kpiVal"));
+
+        int r = 9; // Excel row 10
+
+        // Cars Unlocked ------------------------------------------------------------------------
+        r = sectionBanner(sheet, r, "CARS UNLOCKED", name, s, lastCol);
+        int chartRow = r + 1;
+        r++; // spacer
+        carsHeader(sheet, r++, weeks, s);
+        List<String> carNames = carOrder(full.cars, code, name);
+        int ds = r;
+        double[] carsColTotal = new double[nw];
+        double carsColCum = 0;
+        for (String carName : carNames) {
+            double[] wk = new double[nw];
+            for (int i = 0; i < nw; i++) {
+                wk[i] = carField(weekly.get(i).cars, code, name, carName, "unlocked");
+                carsColTotal[i] += wk[i];
+            }
+            double cum = carField(full.cars, code, name, carName, "cumulative");
+            carsColCum += cum;
+            put(sheet, r, 1, carName, s.get("carName"));
+            weekRow(sheet, r, 1, wk, cum, s.get("num"));
+            r++;
+        }
+        int de = r - 1;
+        put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
+        weekRow(sheet, r, 1, carsColTotal, carsColCum, s.get("gtAccentNum"));
+        r++;
+        addBarChart(drawing, sheet, chartRow, ds, de, nw, lastCol, null);
+        r = Math.max(r, chartRow + CHART_ROWS) + 2;
+
+        // Remote Control Played ----------------------------------------------------------------
+        r = playedSection(sheet, drawing, s, r, "REMOTE CONTROL PLAYED", name, code, weeks, weekly, full, lastCol, false);
+        // Race Played --------------------------------------------------------------------------
+        r = playedSection(sheet, drawing, s, r, "RACE PLAYED", name, code, weeks, weekly, full, lastCol, true);
+
+        // Store Performance – weekly: Week | iOS | Android | Total -----------------------------
+        r = sectionBanner(sheet, r, "STORE PERFORMANCE " + period, null, s, lastCol);
+        put(sheet, r, 1, "Week", s.get("hdrLeft"));
+        put(sheet, r, 2, "iOS", s.get("hdrRight"));
+        put(sheet, r, 3, "Android", s.get("hdrRight"));
+        put(sheet, r, 4, "Total", s.get("hdrRight"));
+        r++;
+        double iosTot = 0, andTot = 0;
+        for (int i = 0; i < nw; i++) {
+            double ios = storeTotal(weekly.get(i).appStore.get(code));
+            double and = storeTotal(weekly.get(i).playStore.get(code));
+            put(sheet, r, 1, weeks.get(i).label(), s.get("carName"));
+            put(sheet, r, 2, ios, s.get("num"));
+            put(sheet, r, 3, and, s.get("num"));
+            put(sheet, r, 4, ios + and, s.get("num"));
+            iosTot += ios; andTot += and; r++;
+        }
+        put(sheet, r, 1, "Total", s.get("gtLabel"));
+        put(sheet, r, 2, iosTot, s.get("gtNum"));
+        put(sheet, r, 3, andTot, s.get("gtNum"));
+        put(sheet, r, 4, iosTot + andTot, s.get("gtNum"));
+    }
+
+    // ===== Standard report (first template): single "Last week" + "Cumulative" columns ==========
+
+    private void buildStandardSheet(XSSFWorkbook wb, Map<String, XSSFCellStyle> s, String sheetName, String period,
+                                    String code, String name, DataBundle full) {
+        int lastCol = 15;
+        XSSFSheet sheet = wb.createSheet(sheetName);
+        sheet.setDisplayGridlines(false);
+        applyColumnWidthsStd(sheet);
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+
+        fillRow(sheet, 0, 0, lastCol, s.get("title"));
+        put(sheet, 0, 0, "REPORT - " + period, s.get("title"));
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, lastCol));
+        sheet.getRow(0).setHeightInPoints(34);
+        fillRow(sheet, 1, 0, lastCol, s.get("bandBig"));
+
+        Map<String, Object> app = findRow(full.appLaunch, code, name);
+        Map<String, Object> brand = findRow(full.brand, code, name);
+        Map<String, Object> avg = findRow(full.averages, code, name);
+
         labelCell(sheet, 3, 1, 3, "APP LAUNCHES", s.get("yellowLabel"));
         labelCell(sheet, 3, 5, 7, "BRAND VIEWS", s.get("yellowLabel"));
         labelCell(sheet, 3, 9, 11, "USERS", s.get("yellowLabel"));
         put(sheet, 3, 13, null, s.get("periodHdr"));
         labelCell(sheet, 3, 14, 15, "Period", s.get("periodHdr"));
 
-        // headers
-        summaryHeader(sheet, 4, 1, s);
-        summaryHeader(sheet, 4, 5, s);
-        summaryHeader(sheet, 4, 9, s);
+        summaryHeaderStd(sheet, 4, 1, s);
+        summaryHeaderStd(sheet, 4, 5, s);
+        summaryHeaderStd(sheet, 4, 9, s);
         put(sheet, 4, 13, "Average Cars Per Users", s.get("periodHdr"));
         labelCell(sheet, 4, 14, 15, fmt2(toDouble(avg.get("avgCars"))), s.get("kpiVal"));
 
-        // data row
         put(sheet, 5, 1, name, s.get("ctyName"));
         put(sheet, 5, 2, toDouble(app.get("launches")), s.get("num"));
         put(sheet, 5, 3, toDouble(app.get("cumulative")), s.get("num"));
@@ -602,21 +747,20 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         put(sheet, 5, 13, "Average Remote Control Played", s.get("periodHdr"));
         labelCell(sheet, 5, 14, 15, formatDuration(toDouble(avg.get("avgRC"))), s.get("kpiVal"));
 
-        // grand total row (single country -> the same figures, flagged as the total)
-        grandTotal(sheet, 6, 1, toDouble(app.get("launches")), toDouble(app.get("cumulative")), s);
-        grandTotal(sheet, 6, 5, toDouble(brand.get("views")), toDouble(brand.get("cumulative")), s);
-        grandTotal(sheet, 6, 9, toDouble(avg.get("totalUsers")), toDouble(avg.get("cummulativeUsers")), s);
+        grandTotalStd(sheet, 6, 1, toDouble(app.get("launches")), toDouble(app.get("cumulative")), s);
+        grandTotalStd(sheet, 6, 5, toDouble(brand.get("views")), toDouble(brand.get("cumulative")), s);
+        grandTotalStd(sheet, 6, 9, toDouble(avg.get("totalUsers")), toDouble(avg.get("cummulativeUsers")), s);
         put(sheet, 6, 13, "Average Race Played", s.get("periodHdr"));
         labelCell(sheet, 6, 14, 15, formatDuration(toDouble(avg.get("avgRace"))), s.get("kpiVal"));
 
-        int r = 9; // Excel row 10
+        int r = 9;
 
         // Cars Unlocked ------------------------------------------------------------------------
-        List<Map<String, Object>> cars = filterByCountry(carsUnlocked, code, name);
-        r = sectionBanner(sheet, r, "CARS UNLOCKED", name, s);
+        List<Map<String, Object>> cars = filterByCountry(full.cars, code, name);
+        r = sectionBanner(sheet, r, "CARS UNLOCKED", name, s, lastCol);
         int chartRow = r + 1;
         r++; // spacer
-        carsHeader(sheet, r++, "CARS", s);
+        carsHeaderStd(sheet, r++, s);
         int ds = r;
         double lwSum = 0, cumSum = 0;
         for (Map<String, Object> car : cars) {
@@ -627,46 +771,39 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             lwSum += lw; cumSum += cu; r++;
         }
         int de = r - 1;
-        grandTotalCars(sheet, r++, lwSum, cumSum, s);
-        addBarChart(drawing, sheet, chartRow, ds, de, null);
-        // Drop below the chart (which is taller than this short table) so the next section and its
-        // chart start in their own clear area and never overlap.
+        put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
+        put(sheet, r, 2, lwSum, s.get("gtAccentNum"));
+        put(sheet, r, 3, cumSum, s.get("gtAccentNum"));
+        r++;
+        addBarChartStd(drawing, sheet, chartRow, ds, de, null);
         r = Math.max(r, chartRow + CHART_ROWS) + 2;
 
-        // Remote Control Played ----------------------------------------------------------------
-        r = playedSection(sheet, drawing, s, r, "REMOTE CONTROL PLAYED", name,
-                filterByCountry(rcPlayed, code, name));
+        r = playedSectionStd(sheet, drawing, s, r, "REMOTE CONTROL PLAYED", name, filterByCountry(full.rc, code, name), lastCol);
+        r = playedSectionStd(sheet, drawing, s, r, "RACE PLAYED", name, filterByCountry(full.race, code, name), lastCol);
 
-        // Race Played --------------------------------------------------------------------------
-        r = playedSection(sheet, drawing, s, r, "RACE PLAYED", name,
-                filterByCountry(racePlayed, code, name));
-
-        // Store Performance --------------------------------------------------------------------
-        r = sectionBanner(sheet, r, "STORE PERFORMANCE " + period, null, s);
-        fillRow(sheet, r, 0, LAST_COL, s.get("band"));
+        // Store Performance (App Store / Play Store totals) ------------------------------------
+        r = sectionBanner(sheet, r, "STORE PERFORMANCE " + period, null, s, lastCol);
+        fillRow(sheet, r, 0, lastCol, s.get("band"));
         put(sheet, r++, 1, "App Store", s.get("band"));
-        fillRow(sheet, r, 0, LAST_COL, s.get("band"));
+        fillRow(sheet, r, 0, lastCol, s.get("band"));
         put(sheet, r, 1, name, s.get("band"));
-        put(sheet, r++, 2, formatK(storeTotal(appStore)), s.get("storeYellow"));
+        put(sheet, r++, 2, formatK(storeTotal(full.appStore.get(code))), s.get("storeYellow"));
         r++; // spacer
-        fillRow(sheet, r, 0, LAST_COL, s.get("band"));
+        fillRow(sheet, r, 0, lastCol, s.get("band"));
         put(sheet, r++, 1, "Google Play Store", s.get("band"));
-        fillRow(sheet, r, 0, LAST_COL, s.get("band"));
+        fillRow(sheet, r, 0, lastCol, s.get("band"));
         put(sheet, r, 1, name, s.get("band"));
-        put(sheet, r, 2, formatK(storeTotal(playStore)), s.get("storeYellow"));
+        put(sheet, r, 2, formatK(storeTotal(full.playStore.get(code))), s.get("storeYellow"));
     }
 
-    /** Renders a Remote-Control / Race "Played Minutes" + "Played Hours" block and returns the next row. */
-    private int playedSection(XSSFSheet sheet, XSSFDrawing drawing, Map<String, XSSFCellStyle> s, int r,
-                              String title, String name, List<Map<String, Object>> cars) {
-        r = sectionBanner(sheet, r, title, name, s);
+    private int playedSectionStd(XSSFSheet sheet, XSSFDrawing drawing, Map<String, XSSFCellStyle> s, int r,
+                                 String title, String name, List<Map<String, Object>> cars, int lastCol) {
+        r = sectionBanner(sheet, r, title, name, s, lastCol);
         int chartRow = r + 1;
         r++; // spacer
-
-        // Played Minutes
         labelCell(sheet, r, 2, 3, "Played Minutes", s.get("sub"));
         r++;
-        carsHeader(sheet, r++, "CARS", s);
+        carsHeaderStd(sheet, r++, s);
         int ds = r;
         double lwMin = 0, cumMin = 0;
         for (Map<String, Object> car : cars) {
@@ -678,14 +815,15 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             lwMin += lw; cumMin += cu; r++;
         }
         int de = r - 1;
-        grandTotal(sheet, r++, 1, lwMin, cumMin, s);
-        addBarChart(drawing, sheet, chartRow, ds, de, "Played Duration");
+        put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
+        put(sheet, r, 2, lwMin, s.get("gtNum"));
+        put(sheet, r, 3, cumMin, s.get("gtNum"));
+        r++;
+        addBarChartStd(drawing, sheet, chartRow, ds, de, "Played Duration");
         r++; // spacer
-
-        // Played Hours
         labelCell(sheet, r, 2, 3, "Played Hours", s.get("sub"));
         r++;
-        carsHeader(sheet, r++, "CARS", s);
+        carsHeaderStd(sheet, r++, s);
         for (Map<String, Object> car : cars) {
             put(sheet, r, 1, str(car.get("carName")), s.get("carName"));
             put(sheet, r, 2, str(car.get("totalRacDurationInHours")), s.get("str"));
@@ -696,6 +834,117 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         put(sheet, r, 2, formatDuration(lwMin), s.get("gtAccentStr"));
         put(sheet, r, 3, formatDuration(cumMin), s.get("gtAccentStr"));
         r++;
+        r = Math.max(r, chartRow + CHART_ROWS) + 2;
+        return r;
+    }
+
+    private void summaryHeaderStd(XSSFSheet sheet, int r, int c0, Map<String, XSSFCellStyle> s) {
+        put(sheet, r, c0, "COUNTRY", s.get("hdrLeft"));
+        put(sheet, r, c0 + 1, "Last week", s.get("hdrRight"));
+        put(sheet, r, c0 + 2, "Cumulative", s.get("hdrRight"));
+    }
+
+    private void carsHeaderStd(XSSFSheet sheet, int r, Map<String, XSSFCellStyle> s) {
+        put(sheet, r, 1, "CARS", s.get("carsHdr"));
+        put(sheet, r, 2, "Last week", s.get("hdrRight"));
+        put(sheet, r, 3, "Cumulative", s.get("hdrRight"));
+    }
+
+    private void grandTotalStd(XSSFSheet sheet, int r, int c0, double lw, double cum, Map<String, XSSFCellStyle> s) {
+        put(sheet, r, c0, "Grand Total", s.get("gtLabel"));
+        put(sheet, r, c0 + 1, lw, s.get("gtNum"));
+        put(sheet, r, c0 + 2, cum, s.get("gtNum"));
+    }
+
+    private void addBarChartStd(XSSFDrawing drawing, XSSFSheet sheet, int topRow, int dataStart, int dataEnd, String title) {
+        if (dataEnd < dataStart) return;
+        try {
+            XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 5, topRow, 14, topRow + CHART_ROWS);
+            XSSFChart chart = drawing.createChart(anchor);
+            if (title != null) { chart.setTitleText(title); chart.setTitleOverlay(false); }
+            chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
+            XDDFCategoryAxis bottom = chart.createCategoryAxis(AxisPosition.BOTTOM);
+            XDDFValueAxis left = chart.createValueAxis(AxisPosition.LEFT);
+            XDDFDataSource<String> cats = XDDFDataSourcesFactory.fromStringCellRange(sheet,
+                    new CellRangeAddress(dataStart, dataEnd, CAT_COL, CAT_COL));
+            XDDFNumericalDataSource<Double> lw = XDDFDataSourcesFactory.fromNumericCellRange(sheet,
+                    new CellRangeAddress(dataStart, dataEnd, 2, 2));
+            XDDFNumericalDataSource<Double> cum = XDDFDataSourcesFactory.fromNumericCellRange(sheet,
+                    new CellRangeAddress(dataStart, dataEnd, 3, 3));
+            XDDFBarChartData data = (XDDFBarChartData) chart.createData(ChartTypes.BAR, bottom, left);
+            data.setBarDirection(BarDirection.COL);
+            XDDFChartData.Series s1 = data.addSeries(cats, lw);
+            s1.setTitle("Last week", null);
+            setSeriesColor(s1, 0x15, 0x60, 0x82);
+            XDDFChartData.Series s2 = data.addSeries(cats, cum);
+            s2.setTitle("Cumulative", null);
+            setSeriesColor(s2, 0xE9, 0x71, 0x32);
+            chart.plot(data);
+        } catch (Exception e) {
+            log.warn("Skipping chart ({}): {}", title, e.getMessage());
+        }
+    }
+
+    private void applyColumnWidthsStd(XSSFSheet sheet) {
+        double[] widths = {0, 39.4, 27.9, 19.1, 11.1, 19.1, 14.4, 13.3, 11.1, 19.1, 17.3, 15.2, 33.1, 21.5, 14.4, 12.0};
+        for (int c = 1; c < widths.length; c++) sheet.setColumnWidth(c, (int) (widths[c] * 256));
+    }
+
+    // ===== Weekly report (second template): one column per week + Cumulative ====================
+
+    /** Renders a Remote-Control / Race "Played Minutes" + "Played Hours" block and returns the next row. */
+    private int playedSection(XSSFSheet sheet, XSSFDrawing drawing, Map<String, XSSFCellStyle> s, int r,
+                              String title, String name, String code, List<Week> weeks,
+                              List<DataBundle> weekly, DataBundle full, int lastCol, boolean race) {
+        int nw = weeks.size();
+        r = sectionBanner(sheet, r, title, name, s, lastCol);
+        int chartRow = r + 1;
+        r++; // spacer
+
+        List<String> carNames = carOrder(race ? full.race : full.rc, code, name);
+
+        // Played Minutes
+        labelCell(sheet, r, 2, 3, "Played Minutes", s.get("sub"));
+        r++;
+        carsHeader(sheet, r++, weeks, s);
+        int ds = r;
+        double[] colTot = new double[nw];
+        double colCum = 0;
+        for (String carName : carNames) {
+            double[] wk = new double[nw];
+            for (int i = 0; i < nw; i++) {
+                wk[i] = Math.round(carField(race ? weekly.get(i).race : weekly.get(i).rc, code, name, carName, "totalRcDuration"));
+                colTot[i] += wk[i];
+            }
+            double cum = Math.round(carField(race ? full.race : full.rc, code, name, carName, "cumulativeRcDuration"));
+            colCum += cum;
+            put(sheet, r, 1, carName, s.get("carName"));
+            weekRow(sheet, r, 1, wk, cum, s.get("num"));
+            r++;
+        }
+        int de = r - 1;
+        put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
+        weekRow(sheet, r, 1, colTot, colCum, s.get("gtNum"));
+        r++;
+        addBarChart(drawing, sheet, chartRow, ds, de, nw, lastCol, "Played Duration");
+        r++; // spacer
+
+        // Played Hours
+        labelCell(sheet, r, 2, 3, "Played Hours", s.get("sub"));
+        r++;
+        carsHeader(sheet, r++, weeks, s);
+        for (String carName : carNames) {
+            put(sheet, r, 1, carName, s.get("carName"));
+            for (int i = 0; i < nw; i++) {
+                put(sheet, r, 2 + i, carFieldStr(race ? weekly.get(i).race : weekly.get(i).rc, code, name, carName, "totalRacDurationInHours"), s.get("str"));
+            }
+            put(sheet, r, 2 + nw, carFieldStr(race ? full.race : full.rc, code, name, carName, "cumulativeRacDurationInHours"), s.get("str"));
+            r++;
+        }
+        put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
+        for (int i = 0; i < nw; i++) put(sheet, r, 2 + i, formatDuration(colTot[i]), s.get("gtAccentStr"));
+        put(sheet, r, 2 + nw, formatDuration(colCum), s.get("gtAccentStr"));
+        r++;
         // Ensure the next section starts below both this section's tables and its chart.
         r = Math.max(r, chartRow + CHART_ROWS) + 2;
         return r;
@@ -703,38 +952,32 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
     // ----- small layout helpers -----
 
-    private int sectionBanner(XSSFSheet sheet, int r, String title, String countryName, Map<String, XSSFCellStyle> s) {
-        fillRow(sheet, r, 0, LAST_COL, s.get("bandBig"));
+    private int sectionBanner(XSSFSheet sheet, int r, String title, String countryName, Map<String, XSSFCellStyle> s, int lastCol) {
+        fillRow(sheet, r, 0, lastCol, s.get("bandBig"));
         put(sheet, r++, 1, title, s.get("bandBig"));
         if (countryName != null) {
-            fillRow(sheet, r, 0, LAST_COL, s.get("band"));
+            fillRow(sheet, r, 0, lastCol, s.get("band"));
             put(sheet, r++, 1, countryName, s.get("band"));
         }
         return r;
     }
 
-    private void summaryHeader(XSSFSheet sheet, int r, int c0, Map<String, XSSFCellStyle> s) {
+    private void summaryHeader(XSSFSheet sheet, int r, int c0, List<Week> weeks, Map<String, XSSFCellStyle> s) {
         put(sheet, r, c0, "COUNTRY", s.get("hdrLeft"));
-        put(sheet, r, c0 + 1, "Last week", s.get("hdrRight"));
-        put(sheet, r, c0 + 2, "Cumulative", s.get("hdrRight"));
+        for (int i = 0; i < weeks.size(); i++) put(sheet, r, c0 + 1 + i, weeks.get(i).label(), s.get("hdrRight"));
+        put(sheet, r, c0 + 1 + weeks.size(), "Cumulative", s.get("hdrRight"));
     }
 
-    private void grandTotal(XSSFSheet sheet, int r, int c0, double lw, double cum, Map<String, XSSFCellStyle> s) {
-        put(sheet, r, c0, "Grand Total", s.get("gtLabel"));
-        put(sheet, r, c0 + 1, lw, s.get("gtNum"));
-        put(sheet, r, c0 + 2, cum, s.get("gtNum"));
+    private void carsHeader(XSSFSheet sheet, int r, List<Week> weeks, Map<String, XSSFCellStyle> s) {
+        put(sheet, r, 1, "CARS", s.get("carsHdr"));
+        for (int i = 0; i < weeks.size(); i++) put(sheet, r, 2 + i, weeks.get(i).label(), s.get("hdrRight"));
+        put(sheet, r, 2 + weeks.size(), "Cumulative", s.get("hdrRight"));
     }
 
-    private void grandTotalCars(XSSFSheet sheet, int r, double lw, double cum, Map<String, XSSFCellStyle> s) {
-        put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
-        put(sheet, r, 2, lw, s.get("gtAccentNum"));
-        put(sheet, r, 3, cum, s.get("gtAccentNum"));
-    }
-
-    private void carsHeader(XSSFSheet sheet, int r, String first, Map<String, XSSFCellStyle> s) {
-        put(sheet, r, 1, first, s.get("carsHdr"));
-        put(sheet, r, 2, "Last week", s.get("hdrRight"));
-        put(sheet, r, 3, "Cumulative", s.get("hdrRight"));
+    /** Writes nw weekly values starting at c0+1, then the Cumulative value at c0+1+nw. */
+    private void weekRow(XSSFSheet sheet, int r, int c0, double[] weekVals, double cum, XSSFCellStyle style) {
+        for (int i = 0; i < weekVals.length; i++) put(sheet, r, c0 + 1 + i, weekVals[i], style);
+        put(sheet, r, c0 + 1 + weekVals.length, cum, style);
     }
 
     private void labelCell(XSSFSheet sheet, int r, int c0, int c1, String text, XSSFCellStyle style) {
@@ -757,32 +1000,39 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         if (style != null) cell.setCellStyle(style);
     }
 
-    private void addBarChart(XSSFDrawing drawing, XSSFSheet sheet, int topRow, int dataStart, int dataEnd, String title) {
-        if (dataEnd < dataStart) return; // nothing to plot
+    /** Grouped bar chart with one series per week column (C..), categories = car names (col B). */
+    private void addBarChart(XSSFDrawing drawing, XSSFSheet sheet, int topRow, int dataStart, int dataEnd,
+                             int nw, int lastCol, String title) {
+        if (dataEnd < dataStart || nw <= 0) return; // nothing to plot
         try {
-            XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 5, topRow, 14, topRow + CHART_ROWS);
+            int anchorCol = nw + 4;                       // start to the right of the table (B..Cumulative)
+            int c2 = Math.min(anchorCol + 9, lastCol);
+            XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, anchorCol, topRow, c2, topRow + CHART_ROWS);
             XSSFChart chart = drawing.createChart(anchor);
             if (title != null) { chart.setTitleText(title); chart.setTitleOverlay(false); }
             chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
 
             XDDFCategoryAxis bottom = chart.createCategoryAxis(AxisPosition.BOTTOM);
             XDDFValueAxis left = chart.createValueAxis(AxisPosition.LEFT);
-
             XDDFDataSource<String> cats = XDDFDataSourcesFactory.fromStringCellRange(sheet,
                     new CellRangeAddress(dataStart, dataEnd, CAT_COL, CAT_COL));
-            XDDFNumericalDataSource<Double> lw = XDDFDataSourcesFactory.fromNumericCellRange(sheet,
-                    new CellRangeAddress(dataStart, dataEnd, LW_COL, LW_COL));
-            XDDFNumericalDataSource<Double> cum = XDDFDataSourcesFactory.fromNumericCellRange(sheet,
-                    new CellRangeAddress(dataStart, dataEnd, CUM_COL, CUM_COL));
 
             XDDFBarChartData data = (XDDFBarChartData) chart.createData(ChartTypes.BAR, bottom, left);
             data.setBarDirection(BarDirection.COL);
-            XDDFChartData.Series s1 = data.addSeries(cats, lw);
-            s1.setTitle("Last week", null);
-            setSeriesColor(s1, 0x15, 0x60, 0x82);
-            XDDFChartData.Series s2 = data.addSeries(cats, cum);
-            s2.setTitle("Cumulative", null);
-            setSeriesColor(s2, 0xE9, 0x71, 0x32);
+            int[][] palette = {{0x15, 0x60, 0x82}, {0xE9, 0x71, 0x32}, {0x19, 0x6B, 0x24},
+                    {0x0F, 0x9E, 0xD5}, {0xA0, 0x2B, 0x93}, {0x4E, 0xA7, 0x2E}};
+            Row header = sheet.getRow(dataStart - 1);
+            for (int i = 0; i < nw; i++) {
+                int col = 2 + i; // C, D, ...
+                XDDFNumericalDataSource<Double> vals = XDDFDataSourcesFactory.fromNumericCellRange(sheet,
+                        new CellRangeAddress(dataStart, dataEnd, col, col));
+                XDDFChartData.Series ser = data.addSeries(cats, vals);
+                String label = (header != null && header.getCell(col) != null)
+                        ? header.getCell(col).getStringCellValue() : ("W" + (i + 1));
+                ser.setTitle(label, null);
+                int[] rgb = palette[i % palette.length];
+                setSeriesColor(ser, rgb[0], rgb[1], rgb[2]);
+            }
             chart.plot(data);
         } catch (Exception e) {
             log.warn("Skipping chart ({}): {}", title, e.getMessage());
@@ -798,10 +1048,10 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         series.setShapeProperties(props);
     }
 
-    private void applyColumnWidths(XSSFSheet sheet) {
-        double[] widths = {0, 39.4, 27.9, 19.1, 11.1, 19.1, 14.4, 13.3, 11.1, 19.1, 17.3, 15.2, 33.1, 21.5, 14.4, 12.0};
-        for (int c = 1; c < widths.length; c++) {
-            sheet.setColumnWidth(c, (int) (widths[c] * 256));
+    private void applyColumnWidths(XSSFSheet sheet, int lastCol, int periodLabelCol) {
+        for (int c = 1; c <= lastCol; c++) {
+            double w = (c == 1) ? 39.4 : (c == periodLabelCol) ? 33.1 : 15.5; // B wide; Period label wide; rest uniform
+            sheet.setColumnWidth(c, (int) (w * 256));
         }
     }
 
@@ -979,6 +1229,105 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         if (list == null) return 0;
         double total = 0;
         for (Map<String, Object> row : list) total += toDouble(row.get("downloadCount"));
+        return total;
+    }
+
+    // ----- weekly bundling -----
+
+    /** All dashboard datasets for one date range (full range, or a single week). */
+    private static final class DataBundle {
+        List<Map<String, Object>> appLaunch, brand, averages, cars, rc, race;
+        Map<String, List<Map<String, Object>>> appStore, playStore;
+    }
+
+    /** Runs the same services the dashboard screen uses, scoped to the given date range. */
+    private DataBundle gather(Map<String, String> fd) {
+        DataBundle b = new DataBundle();
+        try {
+            b.appLaunch = listFromResponse(appLaunchedService.getCountryWiseData(fd), "summaryTable");
+            b.brand = listFromResponse(brandViewedGarageService.getCountryWiseData(fd), "summaryTable");
+            b.averages = listFromResponse(carUnlockedService.getCountryWiseAverages(fd), null);
+            b.cars = listFromResponse(carUnlockedService.getCarUnlockedData(fd), "summary");
+            b.rc = listFromResponse(rcPlayedService.getCountryWiseData(fd), "summary");
+            b.race = listFromResponse(racePlayedService.getCountryWiseData(fd), "summary");
+            b.appStore = graphFromResponse(appStoreSalesServiceImpl.fetchAppStoreSalesReport(fd));
+            b.playStore = graphFromResponse(playStoreReportServiceImpl.fetchPlayStoreSalesReport(fd));
+        } catch (Exception e) {
+            log.warn("Data gather failed for range {}..{}: {}", fd.get("startDate"), fd.get("endDate"), e.getMessage());
+        }
+        if (b.appLaunch == null) b.appLaunch = Collections.emptyList();
+        if (b.brand == null) b.brand = Collections.emptyList();
+        if (b.averages == null) b.averages = Collections.emptyList();
+        if (b.cars == null) b.cars = Collections.emptyList();
+        if (b.rc == null) b.rc = Collections.emptyList();
+        if (b.race == null) b.race = Collections.emptyList();
+        if (b.appStore == null) b.appStore = Collections.emptyMap();
+        if (b.playStore == null) b.playStore = Collections.emptyMap();
+        return b;
+    }
+
+    /** A 7-day bucket of the report range, e.g. "21 Sep - 27 Sep". */
+    private record Week(String start, String end, String label) {}
+
+    /** Splits [startIso, endIso] into consecutive 7-day weeks (label uses the full 7-day span). */
+    private List<Week> computeWeeks(String startIso, String endIso) {
+        List<Week> weeks = new ArrayList<>();
+        try {
+            LocalDate start = LocalDate.parse(startIso.trim());
+            LocalDate end = LocalDate.parse(endIso.trim());
+            DateTimeFormatter f = DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH);
+            // Weeks align to calendar Mon–Sun: the first week runs from the selected start date
+            // to that week's Sunday (so a mid-week start yields a short first column), each later
+            // week runs Monday–Sunday, and the last week is capped at the selected end date.
+            LocalDate ws = start;
+            while (!ws.isAfter(end)) {
+                LocalDate sunday = ws.plusDays(7 - ws.getDayOfWeek().getValue()); // end of ws's calendar week
+                LocalDate weekEnd = sunday.isAfter(end) ? end : sunday;
+                weeks.add(new Week(ws.toString(), weekEnd.toString(), ws.format(f) + " - " + weekEnd.format(f)));
+                ws = weekEnd.plusDays(1); // next week starts the day after this week's end (a Monday)
+            }
+        } catch (Exception e) {
+            log.warn("Week computation failed for {}..{}: {}", startIso, endIso, e.getMessage());
+        }
+        return weeks;
+    }
+
+    /** Ordered distinct car names for one country from a cars/rc/race summary list. */
+    private List<String> carOrder(List<Map<String, Object>> list, String code, String name) {
+        List<String> out = new ArrayList<>();
+        for (Map<String, Object> row : filterByCountry(list, code, name)) {
+            String cn = str(row.get("carName"));
+            if (cn != null && !out.contains(cn)) out.add(cn);
+        }
+        return out;
+    }
+
+    private double carField(List<Map<String, Object>> list, String code, String name, String carName, String field) {
+        for (Map<String, Object> row : filterByCountry(list, code, name)) {
+            if (carName.equals(str(row.get("carName")))) return toDouble(row.get(field));
+        }
+        return 0;
+    }
+
+    private String carFieldStr(List<Map<String, Object>> list, String code, String name, String carName, String field) {
+        for (Map<String, Object> row : filterByCountry(list, code, name)) {
+            if (carName.equals(str(row.get("carName")))) {
+                String v = str(row.get(field));
+                return v != null ? v : "";
+            }
+        }
+        return "";
+    }
+
+    private double sumField(List<Map<String, Object>> list, String field) {
+        double total = 0;
+        for (Map<String, Object> row : list) total += toDouble(row.get(field));
+        return total;
+    }
+
+    private double roundSumField(List<Map<String, Object>> list, String field) {
+        double total = 0;
+        for (Map<String, Object> row : list) total += Math.round(toDouble(row.get(field)));
         return total;
     }
 

@@ -19,6 +19,6 @@ public interface ShellEventsService {
 
     public ApplicationResponse importPlayStoreDataByCSV(MultipartFile multipartFile) throws Exception;
 
-    public ApplicationResponse exportMultiTabExcel(HttpServletResponse response, String startDate, String endDate, String country) throws Exception;
+    public ApplicationResponse exportMultiTabExcel(HttpServletResponse response, String startDate, String endDate, String country, String reportType) throws Exception;
 
 }

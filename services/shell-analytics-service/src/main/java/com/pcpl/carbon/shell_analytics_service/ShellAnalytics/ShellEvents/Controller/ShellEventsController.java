@@ -189,9 +189,11 @@ public class ShellEventsController {
         String startDate = request.get("startDate");
         String endDate = request.get("endDate");
         String country = request.get("country");
+        // "standard" (first template) or "weekly" (week-wise template); defaults to standard.
+        String reportType = request.getOrDefault("reportType", "standard");
 
         try {
-            shellEventsService.exportMultiTabExcel(response, startDate, endDate,country);
+            shellEventsService.exportMultiTabExcel(response, startDate, endDate, country, reportType);
         } catch (Exception e) {
             e.printStackTrace();
             response.reset();

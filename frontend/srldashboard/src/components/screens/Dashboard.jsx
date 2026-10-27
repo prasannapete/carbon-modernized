@@ -160,9 +160,12 @@ const handlePrint = useReactToPrint({
 
 
     const [downloading, setDownloading] = useState(false);
+    const [showReportMenu, setShowReportMenu] = useState(false);
 
-    const handleDownload = async () => {
+    // reportType: 'standard' (first template) or 'weekly' (week-wise template).
+    const handleDownload = async (reportType = 'standard') => {
         const BASE_URL = process.env.REACT_APP_SHELL_ANALYTICS_SERVICE_BASE_URL;
+        setShowReportMenu(false);
         startLoading();
         setDownloading(true);
         try {
@@ -172,11 +175,12 @@ const handlePrint = useReactToPrint({
                     startDate: formatDate(startDate),
                     endDate: formatDate(endDate),
                     country: selectedCountries.map((c) => c.value).join(','),
+                    reportType,
                 },
                 { responseType: 'blob' }
             );
 
-            const fileName = `shell_events_${Date.now()}_${performance.now().toFixed(0)}.xlsx`;
+            const fileName = `shell_events_${reportType}_${Date.now()}_${performance.now().toFixed(0)}.xlsx`;
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
@@ -267,13 +271,40 @@ const handlePrint = useReactToPrint({
                         Filter
                     </button>
 
-                    <button
-                        onClick={handleDownload}
-                        className="filter-button"
-                        disabled={!startDate || !endDate || downloading}
-                    >
-                        {downloading ? "Downloading..." : "Download Excel"}
-                    </button>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowReportMenu((v) => !v)}
+                            className="filter-button"
+                            disabled={!startDate || !endDate || downloading}
+                        >
+                            {downloading ? "Downloading..." : "Download Excel ▾"}
+                        </button>
+                        {showReportMenu && !downloading && (
+                            <div
+                                style={{
+                                    position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 1000,
+                                    background: '#fff', border: '1px solid #ccc', borderRadius: 4,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)', minWidth: 190, overflow: 'hidden',
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownload('standard')}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: '1px solid #eee', background: 'none', cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    Standard Report
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownload('weekly')}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    Weekly Report
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <button onClick={handlePrint} className="filter-button">
                       Print Dashboard
                     </button>
