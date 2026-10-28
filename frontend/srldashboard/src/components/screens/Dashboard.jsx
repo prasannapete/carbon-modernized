@@ -227,7 +227,6 @@ const handlePrint = useReactToPrint({
 
     return (
         <div className="dashboard">
-            {loading && <EvuemeLoader />}
             <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1>Dashboard</h1>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -359,7 +358,10 @@ const handlePrint = useReactToPrint({
 
                 </div>
             </div>
-                <div className="dashboard-content">
+                <div className="dashboard-content" style={{ position: 'relative' }}>
+                    {/* Loader scoped to the content area only: the filter section above stays visible
+                        and usable while data for either view loads or the view is switched. */}
+                    {loading && <EvuemeLoader contained />}
                     {viewMode === 'standard' ? (
                         <>
                             <CustomerStats startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>

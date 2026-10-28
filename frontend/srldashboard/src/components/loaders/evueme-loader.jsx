@@ -2,9 +2,12 @@
 import { FadeLoader } from "react-spinners";
 import '../../css/Loader.css'
 
-const EvuemeLoader = () => {
+// `contained` renders the loader as an overlay scoped to its positioned parent (e.g. only the
+// dashboard content area) instead of the default full-viewport overlay, so surrounding UI such as
+// the filter section stays visible and usable while data loads.
+const EvuemeLoader = ({ contained = false }) => {
   return (
-    <div className="overlay">
+    <div className={contained ? "overlay overlay--contained" : "overlay"}>
       <div className="overlay__inner">
         <div className="overlay__content">
           <FadeLoader

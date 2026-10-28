@@ -11,6 +11,18 @@
     z-index: 9999;
 }
 
+/* Content-scoped variant: fills its positioned parent instead of the whole viewport, so the loader
+   covers only the dashboard content area and leaves the filter section visible and usable. */
+.overlay--contained {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    min-height: 200px;
+    border-radius: 8px;
+}
+
 .overlay__inner {
     text-align: center;
 }
