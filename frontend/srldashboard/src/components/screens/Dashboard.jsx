@@ -28,6 +28,7 @@ import carbonLogo from '../../assets/carbon-logo.png';
 import html2pdf from "html2pdf.js";
 import CompetitionPlayed from "./CompetitionPlayed";
 import CompetitionPlayedPrint from "./CompetitionPlayedPrint";
+import WeeklyView from "./WeeklyView";
 
 const Dashboard = () => {
     const printRef = useRef(null);
@@ -161,6 +162,10 @@ const handlePrint = useReactToPrint({
 
     const [downloading, setDownloading] = useState(false);
     const [showReportMenu, setShowReportMenu] = useState(false);
+
+    // Dashboard view: 'standard' (default, existing layout) or 'weekly' (week-column tables + graphs).
+    const [viewMode, setViewMode] = useState('standard');
+    const [showViewMenu, setShowViewMenu] = useState(false);
 
     // reportType: 'standard' (first template) or 'weekly' (week-wise template).
     const handleDownload = async (reportType = 'standard') => {
@@ -312,19 +317,67 @@ const handlePrint = useReactToPrint({
                             </div>
                         )}
                     </div>
-                    <button onClick={handlePrint} className="filter-button">
+                    {/* Print Dashboard kept in place but hidden for now (handler preserved). */}
+                    <button onClick={handlePrint} className="filter-button" style={{ display: 'none' }}>
                       Print Dashboard
                     </button>
+
+                    {/* View switcher: Standard View (default) / Weekly View. */}
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowViewMenu((v) => !v)}
+                            className="filter-button"
+                        >
+                            {viewMode === 'weekly' ? 'Weekly View ▾' : 'Standard View ▾'}
+                        </button>
+                        {showViewMenu && (
+                            <div
+                                style={{
+                                    position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 1000,
+                                    background: '#fff', border: '1px solid #ccc', borderRadius: 4,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)', minWidth: 170, overflow: 'hidden',
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => { setViewMode('standard'); setShowViewMenu(false); }}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: '1px solid #eee', background: viewMode === 'standard' ? '#f2f8fb' : 'none', cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    Standard View
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setViewMode('weekly'); setShowViewMenu(false); }}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', background: viewMode === 'weekly' ? '#f2f8fb' : 'none', cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    Weekly View
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                 </div>
             </div>
                 <div className="dashboard-content">
-                    <CustomerStats startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>
-                    <AppLaunches startDate={filters.startDate} endDate={filters.endDate} country={filters.country} />
-                    <CarsUnlocked startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading} isPrinting={filters.isPrinting}/>
-                    <RemoteControlPlayed startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>
-                    <RacePlayed startDate={filters.startDate} endDate={filters.endDate} country={filters.country}/>
-                    <CompetitionPlayed startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>
+                    {viewMode === 'standard' ? (
+                        <>
+                            <CustomerStats startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>
+                            <AppLaunches startDate={filters.startDate} endDate={filters.endDate} country={filters.country} />
+                            <CarsUnlocked startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading} isPrinting={filters.isPrinting}/>
+                            <RemoteControlPlayed startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>
+                            <RacePlayed startDate={filters.startDate} endDate={filters.endDate} country={filters.country}/>
+                            <CompetitionPlayed startDate={filters.startDate} endDate={filters.endDate} country={filters.country}  startLoading={startLoading} stopLoading={stopLoading}/>
+                        </>
+                    ) : (
+                        <WeeklyView
+                            startDate={filters.startDate || (startDate ? formatDate(startDate) : '')}
+                            endDate={filters.endDate || (endDate ? formatDate(endDate) : '')}
+                            country={filters.country}
+                            startLoading={startLoading}
+                            stopLoading={stopLoading}
+                        />
+                    )}
 
                     {/*<StorePerformance startDate={filters.startDate} endDate={filters.endDate} country={filters.country}/>*/}
             </div>

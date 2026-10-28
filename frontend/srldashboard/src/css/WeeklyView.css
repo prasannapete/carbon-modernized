@@ -1,0 +1,150 @@
+/* Weekly View – scoped styles so the Standard View's shared .summary-table rules
+   (fixed table-layout + block tbody, which crush many week columns and block
+   horizontal scroll) are never touched. Visual design mirrors the Weekly Report
+   Excel: blue header fill (#83CBEB), bold headings, COUNTRY/CARS left-aligned,
+   week-range + Cumulative right-aligned, thin borders, Aptos Narrow typography. */
+
+.weekly-section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.weekly-section h2 {
+    font-size: 1.5rem;
+    color: #333;
+    margin: 0 0 16px 0;
+    font-weight: 600;
+}
+
+/* A country block inside a nested section (Cars Unlocked / RC / Race). */
+.weekly-country {
+    margin-bottom: 18px;
+}
+
+.weekly-country-title {
+    background-color: #2196f3;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 10px 16px;
+    border-radius: 4px;
+    margin: 0 0 12px 0;
+}
+
+/* Layout of a table + its graph. Default (many week columns): stacked, table above the full-width
+   graph. The .side modifier (few week columns) puts them next to each other. */
+.weekly-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.weekly-layout.side {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.weekly-layout.side .weekly-scroll {
+    flex: 1 1 50%;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.weekly-layout.side .weekly-chart {
+    flex: 1 1 50%;
+    min-width: 0;
+}
+
+/* Horizontal scroll container: stays inside the table area only. The scrollbar
+   sits at the bottom of THIS box; it cannot overlap the chart, other tables,
+   headings, filters or surrounding content because each table has its own box
+   and the chart lives in a separate full-width block. */
+.weekly-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+}
+
+/* width:max-content lets columns size to their content (so long date headings
+   stay fully visible) and makes the whole table scroll horizontally inside
+   .weekly-scroll when it is wider than the card. table-layout:auto (default)
+   so headings are never clipped. */
+.weekly-table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 100%;
+    font-family: 'Aptos Narrow', 'Aptos', Arial, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+}
+
+.weekly-table th,
+.weekly-table td {
+    border: 1px solid #bcbcbc;
+    padding: 7px 14px;
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* COUNTRY / CARS label column is left-aligned, like the Excel. */
+.weekly-table th.wk-name,
+.weekly-table td.wk-name {
+    text-align: left;
+}
+
+.weekly-table thead th {
+    background-color: #83CBEB;
+    color: #11314a;
+    font-weight: 700;
+}
+
+.weekly-table tbody tr:nth-child(even) td {
+    background-color: #f6fbfe;
+}
+
+.weekly-table tfoot td {
+    background-color: #eaf6fc;
+    font-weight: 700;
+}
+
+/* Full-width chart block, sits below its table. */
+.weekly-chart {
+    width: 100%;
+    height: 300px;
+}
+
+.weekly-empty {
+    padding: 24px;
+    text-align: center;
+    color: #666;
+}
+
+/* On narrow screens, always stack even in side-by-side mode so neither element is squeezed. */
+@media (max-width: 1024px) {
+    .weekly-layout.side {
+        flex-direction: column;
+        gap: 0;
+    }
+    .weekly-layout.side .weekly-scroll {
+        flex: none;
+        width: 100%;
+        margin-bottom: 16px;
+    }
+    .weekly-layout.side .weekly-chart {
+        flex: none;
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .weekly-section {
+        padding: 15px;
+    }
+}
