@@ -507,7 +507,9 @@ public class ShellEventsServiceImpl implements ShellEventsService{
                     wf.put("startDate", w.start());
                     wf.put("endDate", w.end());
                     wf.put("country", formData.get("country"));
-                    weeklyData.add(gather(wf));
+                    // Per-week bundles never render Store Performance, so skip the App/Play Store
+                    // queries here (2 fewer, heavier queries per week).
+                    weeklyData.add(gather(wf, false));
                 }
             }
 
@@ -534,14 +536,25 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             }
 
             String fileName = "shell_events_" + System.nanoTime() + ".xlsx";
-            log.info("Sending Excel file: {}", fileName);
+            log.info("Generating Excel file: {}", fileName);
+
+            // Build the workbook fully in memory, then write it to the response in one bulk copy with
+            // a known Content-Length. Writing POI's package straight to the servlet output stream
+            // streams it to the browser over a potentially slow connection; if the client aborts the
+            // slow download, the package save fails part-way (e.g. "/docProps/app.xml failed to be
+            // saved in the stream") and leaves a half-committed response that can no longer be reset.
+            // Buffering first makes the save reliable and the socket write a single fast copy.
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            workbook.write(buffer);
+            byte[] bytes = buffer.toByteArray();
+
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
-
-            workbook.write(response.getOutputStream());
+            response.setContentLength(bytes.length);
+            response.getOutputStream().write(bytes);
             response.flushBuffer();
 
-            log.info("Excel generated successfully");
+            log.info("Excel generated successfully ({} bytes)", bytes.length);
 
         } catch (Exception e) {
             log.error("Error generating Excel: {}", e.getMessage(), e);
@@ -590,7 +603,7 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         labelCell(sheet, 3, brandC0, brandC0 + tw - 1, "BRAND VIEWS", s.get("yellowLabel"));
         labelCell(sheet, 3, usersC0, usersC0 + tw - 1, "USERS", s.get("yellowLabel"));
         put(sheet, 3, periodC0, "Period", s.get("periodHdr"));
-        for (int i = 0; i < nw; i++) put(sheet, 3, periodC0 + 1 + i, weeks.get(i).label(), s.get("hdrRight"));
+        for (int i = 0; i < nw; i++) put(sheet, 3, periodC0 + 1 + i, weeks.get(i).label(), s.get("weekHdr"));
         put(sheet, 3, periodC0 + 1 + nw, "Cumulative", s.get("hdrRight"));
 
         summaryHeader(sheet, 4, appC0, weeks, s);
@@ -678,29 +691,9 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         // Remote Control Played ----------------------------------------------------------------
         r = playedSection(sheet, drawing, s, r, "REMOTE CONTROL PLAYED", name, code, weeks, weekly, full, lastCol, false);
         // Race Played --------------------------------------------------------------------------
-        r = playedSection(sheet, drawing, s, r, "RACE PLAYED", name, code, weeks, weekly, full, lastCol, true);
+        playedSection(sheet, drawing, s, r, "RACE PLAYED", name, code, weeks, weekly, full, lastCol, true);
 
-        // Store Performance – weekly: Week | iOS | Android | Total -----------------------------
-        r = sectionBanner(sheet, r, "STORE PERFORMANCE " + period, null, s, lastCol);
-        put(sheet, r, 1, "Week", s.get("hdrLeft"));
-        put(sheet, r, 2, "iOS", s.get("hdrRight"));
-        put(sheet, r, 3, "Android", s.get("hdrRight"));
-        put(sheet, r, 4, "Total", s.get("hdrRight"));
-        r++;
-        double iosTot = 0, andTot = 0;
-        for (int i = 0; i < nw; i++) {
-            double ios = storeTotal(weekly.get(i).appStore.get(code));
-            double and = storeTotal(weekly.get(i).playStore.get(code));
-            put(sheet, r, 1, weeks.get(i).label(), s.get("carName"));
-            put(sheet, r, 2, ios, s.get("num"));
-            put(sheet, r, 3, and, s.get("num"));
-            put(sheet, r, 4, ios + and, s.get("num"));
-            iosTot += ios; andTot += and; r++;
-        }
-        put(sheet, r, 1, "Total", s.get("gtLabel"));
-        put(sheet, r, 2, iosTot, s.get("gtNum"));
-        put(sheet, r, 3, andTot, s.get("gtNum"));
-        put(sheet, r, 4, iosTot + andTot, s.get("gtNum"));
+        // Store Performance section intentionally omitted (removed per request).
     }
 
     // ===== Standard report (first template): single "Last week" + "Cumulative" columns ==========
@@ -779,21 +772,9 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         r = Math.max(r, chartRow + CHART_ROWS) + 2;
 
         r = playedSectionStd(sheet, drawing, s, r, "REMOTE CONTROL PLAYED", name, filterByCountry(full.rc, code, name), lastCol);
-        r = playedSectionStd(sheet, drawing, s, r, "RACE PLAYED", name, filterByCountry(full.race, code, name), lastCol);
+        playedSectionStd(sheet, drawing, s, r, "RACE PLAYED", name, filterByCountry(full.race, code, name), lastCol);
 
-        // Store Performance (App Store / Play Store totals) ------------------------------------
-        r = sectionBanner(sheet, r, "STORE PERFORMANCE " + period, null, s, lastCol);
-        fillRow(sheet, r, 0, lastCol, s.get("band"));
-        put(sheet, r++, 1, "App Store", s.get("band"));
-        fillRow(sheet, r, 0, lastCol, s.get("band"));
-        put(sheet, r, 1, name, s.get("band"));
-        put(sheet, r++, 2, formatK(storeTotal(full.appStore.get(code))), s.get("storeYellow"));
-        r++; // spacer
-        fillRow(sheet, r, 0, lastCol, s.get("band"));
-        put(sheet, r++, 1, "Google Play Store", s.get("band"));
-        fillRow(sheet, r, 0, lastCol, s.get("band"));
-        put(sheet, r, 1, name, s.get("band"));
-        put(sheet, r, 2, formatK(storeTotal(full.playStore.get(code))), s.get("storeYellow"));
+        // Store Performance section intentionally omitted (removed per request).
     }
 
     private int playedSectionStd(XSSFSheet sheet, XSSFDrawing drawing, Map<String, XSSFCellStyle> s, int r,
@@ -840,13 +821,13 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
     private void summaryHeaderStd(XSSFSheet sheet, int r, int c0, Map<String, XSSFCellStyle> s) {
         put(sheet, r, c0, "COUNTRY", s.get("hdrLeft"));
-        put(sheet, r, c0 + 1, "Last week", s.get("hdrRight"));
+        put(sheet, r, c0 + 1, "Period", s.get("hdrRight"));
         put(sheet, r, c0 + 2, "Cumulative", s.get("hdrRight"));
     }
 
     private void carsHeaderStd(XSSFSheet sheet, int r, Map<String, XSSFCellStyle> s) {
         put(sheet, r, 1, "CARS", s.get("carsHdr"));
-        put(sheet, r, 2, "Last week", s.get("hdrRight"));
+        put(sheet, r, 2, "Period", s.get("hdrRight"));
         put(sheet, r, 3, "Cumulative", s.get("hdrRight"));
     }
 
@@ -874,7 +855,7 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             XDDFBarChartData data = (XDDFBarChartData) chart.createData(ChartTypes.BAR, bottom, left);
             data.setBarDirection(BarDirection.COL);
             XDDFChartData.Series s1 = data.addSeries(cats, lw);
-            s1.setTitle("Last week", null);
+            s1.setTitle("Period", null);
             setSeriesColor(s1, 0x15, 0x60, 0x82);
             XDDFChartData.Series s2 = data.addSeries(cats, cum);
             s2.setTitle("Cumulative", null);
@@ -964,13 +945,13 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
     private void summaryHeader(XSSFSheet sheet, int r, int c0, List<Week> weeks, Map<String, XSSFCellStyle> s) {
         put(sheet, r, c0, "COUNTRY", s.get("hdrLeft"));
-        for (int i = 0; i < weeks.size(); i++) put(sheet, r, c0 + 1 + i, weeks.get(i).label(), s.get("hdrRight"));
+        for (int i = 0; i < weeks.size(); i++) put(sheet, r, c0 + 1 + i, weeks.get(i).label(), s.get("weekHdr"));
         put(sheet, r, c0 + 1 + weeks.size(), "Cumulative", s.get("hdrRight"));
     }
 
     private void carsHeader(XSSFSheet sheet, int r, List<Week> weeks, Map<String, XSSFCellStyle> s) {
         put(sheet, r, 1, "CARS", s.get("carsHdr"));
-        for (int i = 0; i < weeks.size(); i++) put(sheet, r, 2 + i, weeks.get(i).label(), s.get("hdrRight"));
+        for (int i = 0; i < weeks.size(); i++) put(sheet, r, 2 + i, weeks.get(i).label(), s.get("weekHdr"));
         put(sheet, r, 2 + weeks.size(), "Cumulative", s.get("hdrRight"));
     }
 
@@ -1050,7 +1031,9 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
     private void applyColumnWidths(XSSFSheet sheet, int lastCol, int periodLabelCol) {
         for (int c = 1; c <= lastCol; c++) {
-            double w = (c == 1) ? 39.4 : (c == periodLabelCol) ? 33.1 : 15.5; // B wide; Period label wide; rest uniform
+            // B wide; Period label wide; the rest (incl. week columns) wide enough to show a full
+            // "dd MMM - dd MMM" date range without clipping.
+            double w = (c == 1) ? 39.4 : (c == periodLabelCol) ? 33.1 : 18.0;
             sheet.setColumnWidth(c, (int) (w * 256));
         }
     }
@@ -1067,13 +1050,20 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         XSSFCellStyle yellow = base(wb, AP, 12, true, "FFFF00", BLACK, HorizontalAlignment.CENTER, null);
         yellow.setBorderBottom(BorderStyle.HAIR);
         m.put("yellowLabel", yellow);
-        XSSFCellStyle hdrLeft = base(wb, AP, 14, true, "83CBEB", BLACK, HorizontalAlignment.LEFT, null);
+        // Table column headings (COUNTRY, Last week, Cumulative, Period, week labels, …) at 12pt.
+        XSSFCellStyle hdrLeft = base(wb, AP, 12, true, "83CBEB", BLACK, HorizontalAlignment.LEFT, null);
         allHair(hdrLeft);
         m.put("hdrLeft", hdrLeft);
-        XSSFCellStyle hdrRight = base(wb, AP, 14, true, "83CBEB", BLACK, HorizontalAlignment.RIGHT, null);
+        XSSFCellStyle hdrRight = base(wb, AP, 12, true, "83CBEB", BLACK, HorizontalAlignment.RIGHT, null);
         allHair(hdrRight);
         m.put("hdrRight", hdrRight);
-        m.put("periodHdr", base(wb, AP, 14, true, "83CBEB", BLACK, HorizontalAlignment.LEFT, null));
+        m.put("periodHdr", base(wb, AP, 12, true, "83CBEB", BLACK, HorizontalAlignment.LEFT, null));
+        // Weekly date-range headings: 12pt, centered and wrap-enabled so labels like "21 Sep - 27 Sep"
+        // stay fully visible (never clipped by the next filled cell) in the week columns.
+        XSSFCellStyle weekHdr = base(wb, AP, 12, true, "83CBEB", BLACK, HorizontalAlignment.CENTER, null);
+        weekHdr.setWrapText(true);
+        allHair(weekHdr);
+        m.put("weekHdr", weekHdr);
         m.put("kpiVal", base(wb, MO, 12, false, null, DATA, HorizontalAlignment.CENTER, null));
         m.put("ctyName", base(wb, AP, 14, false, null, BLACK, HorizontalAlignment.LEFT, null));
         XSSFCellStyle gtLabel = base(wb, AP, 12, true, "C1E5F5", BLACK, HorizontalAlignment.LEFT, null);
@@ -1242,6 +1232,16 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
     /** Runs the same services the dashboard screen uses, scoped to the given date range. */
     private DataBundle gather(Map<String, String> fd) {
+        return gather(fd, true);
+    }
+
+    /**
+     * Runs the dashboard services for the given date range. {@code includeStores} controls whether
+     * the App Store / Play Store datasets are fetched: the per-week bundles of the weekly report do
+     * not use them (the Store Performance section is not rendered), so skipping those two queries
+     * for every week avoids a large amount of redundant DB work and speeds the weekly export up.
+     */
+    private DataBundle gather(Map<String, String> fd, boolean includeStores) {
         DataBundle b = new DataBundle();
         try {
             b.appLaunch = listFromResponse(appLaunchedService.getCountryWiseData(fd), "summaryTable");
@@ -1250,8 +1250,10 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             b.cars = listFromResponse(carUnlockedService.getCarUnlockedData(fd), "summary");
             b.rc = listFromResponse(rcPlayedService.getCountryWiseData(fd), "summary");
             b.race = listFromResponse(racePlayedService.getCountryWiseData(fd), "summary");
-            b.appStore = graphFromResponse(appStoreSalesServiceImpl.fetchAppStoreSalesReport(fd));
-            b.playStore = graphFromResponse(playStoreReportServiceImpl.fetchPlayStoreSalesReport(fd));
+            if (includeStores) {
+                b.appStore = graphFromResponse(appStoreSalesServiceImpl.fetchAppStoreSalesReport(fd));
+                b.playStore = graphFromResponse(playStoreReportServiceImpl.fetchPlayStoreSalesReport(fd));
+            }
         } catch (Exception e) {
             log.warn("Data gather failed for range {}..{}: {}", fd.get("startDate"), fd.get("endDate"), e.getMessage());
         }

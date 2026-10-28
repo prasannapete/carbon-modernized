@@ -180,7 +180,14 @@ const handlePrint = useReactToPrint({
                 { responseType: 'blob' }
             );
 
-            const fileName = `shell_events_${reportType}_${Date.now()}_${performance.now().toFixed(0)}.xlsx`;
+            // File name carries the report-generated date (DD_MM_YYYY), e.g. SRL_ANALYTICS_27_10_2026.xlsx
+            // for the standard report and SRL_ANALYTICS_WEEKLY_27_10_2026.xlsx for the weekly report.
+            const pad = (n) => String(n).padStart(2, '0');
+            const gen = new Date();
+            const genDate = `${pad(gen.getDate())}_${pad(gen.getMonth() + 1)}_${gen.getFullYear()}`;
+            const fileName = reportType === 'weekly'
+                ? `SRL_ANALYTICS_WEEKLY_${genDate}.xlsx`
+                : `SRL_ANALYTICS_${genDate}.xlsx`;
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');

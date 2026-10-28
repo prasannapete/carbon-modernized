@@ -184,7 +184,7 @@ public class ShellEventsController {
 
 
     @RequestMapping(value = "/export-multi-tab-excel", method = RequestMethod.POST)
-    public ApplicationResponse exportMultiTabExcel(HttpServletResponse response,
+    public void exportMultiTabExcel(HttpServletResponse response,
                                     @RequestBody Map<String, String> request) throws Exception {
         String startDate = request.get("startDate");
         String endDate = request.get("endDate");
@@ -192,13 +192,19 @@ public class ShellEventsController {
         // "standard" (first template) or "weekly" (week-wise template); defaults to standard.
         String reportType = request.getOrDefault("reportType", "standard");
 
+        // The service writes the .xlsx bytes straight to the response, so this method returns void:
+        // returning a body would make Spring try to serialize it onto the already-written Excel
+        // stream ("No converter for ApplicationResponse ...").
         try {
             shellEventsService.exportMultiTabExcel(response, startDate, endDate, country, reportType);
         } catch (Exception e) {
             e.printStackTrace();
-            response.reset();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Excel generation failed");
+            // Only reset/send an error page if nothing has been written yet; once the response is
+            // committed, reset() would itself throw "Cannot call reset() after response has been committed".
+            if (!response.isCommitted()) {
+                response.reset();
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Excel generation failed");
+            }
         }
-        return ApplicationResponse.builder().build();
     }
 }
