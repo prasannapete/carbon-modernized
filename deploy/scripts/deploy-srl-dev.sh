@@ -34,7 +34,10 @@ die() { echo "ABORT: $*" >&2; exit 1; }
 rendered=$(kubectl kustomize "$OVERLAY" | sed "s/:GIT_SHA\$/:$TAG/")
 
 grep -q 'GIT_SHA' <<<"$rendered" && die "unsubstituted image tag"
-grep -iq 'playmobil' <<<"$rendered" && die "rendered manifests mention playmobil"
+# No object, label, selector, image or config reference may point at playmobil. (Plain
+# values may: AUTH_ALLOWED_ORIGINS keeps playmobil's existing origins allowed.)
+grep -iqE '^\s*(-\s*)?(name|app|type|serviceName|image|secretName|claimName):.*playmobil' <<<"$rendered" \
+  && die "rendered manifests reference a playmobil object"
 grep -E '^\s*namespace:' <<<"$rendered" | grep -vq "namespace: $NS\$" && die "object outside $NS"
 grep -E 'image: .*:(latest|v0\.0\.1)$' <<<"$rendered" && die "reserved image tag in manifests"
 
