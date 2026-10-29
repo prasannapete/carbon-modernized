@@ -1,0 +1,33 @@
+# carbon-modernized on the `carbon` cluster, srl-dev namespace ONLY.
+#
+# Guardrails (see deploy/README.md):
+#   - There is deliberately no srl-prod overlay. srl-prod (:v0.0.1) is never touched.
+#   - srl-playmobil-service, srl-config-map, Services and Ingresses are not managed here.
+#   - Image tags are git SHAs, set by deploy/scripts/deploy-srl-dev.sh. Never latest/v0.0.1.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: srl-dev
+resources:
+  - carbon-modernized-config.yaml
+  - authserver.yaml
+  - srl-common-service.yaml
+  - srl-shell-analytics-service.yaml
+  - srl-kitkat-service.yaml
+  - srl-dashboard.yaml
+  - srl-leaderboard-web.yaml
+  - srl-web.yaml
+images:
+  - name: prasannapete/srl-auth-server
+    newTag: GIT_SHA
+  - name: prasannapete/srl-common-service
+    newTag: GIT_SHA
+  - name: prasannapete/srl-shell-analytics-service
+    newTag: GIT_SHA
+  - name: prasannapete/srl-kitkat-service
+    newTag: GIT_SHA
+  - name: prasannapete/srl-dashboard
+    newTag: GIT_SHA
+  - name: prasannapete/srl-leaderboard-web-application
+    newTag: GIT_SHA
+  - name: prasannapete/srl-web-application
+    newTag: GIT_SHA

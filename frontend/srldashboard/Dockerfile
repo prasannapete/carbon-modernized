@@ -1,23 +1,23 @@
-FROM --platform=linux/amd64  node:lts
+# Build stage: CRA bakes REACT_APP_* in at build time, so the env file picks the target
+# (.env-dev -> srl-dev URLs). Uses package.json + lockfile (package-prod.json is stale
+# and lacks the PDF/print deps the reports need).
+FROM --platform=linux/amd64 node:22-alpine AS build
 LABEL authors="sharanya"
+WORKDIR /carbon
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
+COPY . .
+ARG ENV_FILE=.env-dev
+RUN cp "${ENV_FILE}" .env
+ENV DISABLE_ESLINT_PLUGIN=true
+RUN CI=false npm run build
+
+# Runtime stage: static files behind nginx. PORT matches the existing srl-dashboard-np
+# targetPort (3000) so the Service and Ingress don't change.
+FROM --platform=linux/amd64 nginx:1.27-alpine
+ENV PORT=3000
+COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /carbon/build /usr/share/nginx/html
 EXPOSE 3000
 
-WORKDIR /carbon
-ADD  package-prod.json /carbon/package.json
-ADD  .env /carbon/.env
-RUN npm install --legacy-peer-deps
-COPY . .
-
-ENV DISABLE_ESLINT_PLUGIN=true
-RUN CI=true npm run build
-ENTRYPOINT ["npm", "start"]
-
-
-# Runtime stage
-#FROM nginx:1.27-alpine
-#COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
-#COPY --from=build /app/build /usr/share/nginx/html
-#EXPOSE 80
-#HEALTHCHECK CMD wget -qO- http://127.0.0.1/ || exit 1
-
- # prasannapete/srl-dashboard
+# prasannapete/srl-dashboard

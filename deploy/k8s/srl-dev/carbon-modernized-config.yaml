@@ -1,0 +1,24 @@
+# Settings the carbon-modernized backends need that srl-config-map doesn't have.
+# Non-secret only. Loaded after srl-config-map, so a key here wins over the shared one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: carbon-modernized-config
+data:
+  # Links in shell-analytics emails
+  APP_BASE_URL: https://srl-dev-dashboard.prapticonsulting.com
+  PLAY_MOBIL_HOME_URL: ""
+  # 1 = SendGrid, 2 = SMTP (MAIL_HOST/MAIL_* in srl-config-map)
+  MAIL_CLIENT_TYPE: "2"
+  # Play Store service-account JSON; not mounted in srl-dev yet, so Play Store
+  # report fetching in shell-analytics is unavailable there.
+  PLAYSTORE_JSON_FILE_PATH: ""
+  # Where the authserver sends a logout without an allowed ?redirect= (the dashboard's
+  # logout). The dashboard has no token then, so it starts a fresh authorization request
+  # and shows the login page. Overrides srl-config-map's http://localhost:3000.
+  SRL_LOGIN_REDIRECT_URL: https://srl-dev-dashboard.prapticonsulting.com
+  # authserver CORS + post-logout redirect allowlist. Same origins as the
+  # srl-auth-server-np-ingress cors-allow-origin annotation (kept so existing
+  # dashboard/playmobil logins keep working), plus leaderboard-web, whose token
+  # call reaches the authserver through its own nginx rather than that ingress.
+  AUTH_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001,https://localhost:3001,https://srl-dev-api.prapticonsulting.com,https://srl-dev-dashboard.prapticonsulting.com,https://srl-dashboard.carbon12011ar.com,http://playmobil.carbon12011ar.com,https://playmobil.carbon12011ar.com,https://leaderboard.prapticonsulting.com"

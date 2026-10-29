@@ -36,7 +36,7 @@ spring:
     cache: false
   web:
     resources:
-      static-locations: ${AUTH_RES_STATIC _PATH:file:///@project.basedir@/res/static/}
+      static-locations: ${AUTH_RES_STATIC_PATH:file:///@project.basedir@/res/static/}
 com:
   pcpl:
     carbon:
@@ -49,6 +49,7 @@ com:
       bowerPath: ${AUTH_RES_BOWER_PATH:file:///@project.basedir@/res/static/bower_components}
       homeUrl: ${SRL_HOME_URL:https://srl-dev-dashboard.prapticonsulting.com}
       loginRedirectURL: ${SRL_LOGIN_REDIRECT_URL:https://srl-dev-dashboard.prapticonsulting.com}
+      allowedOrigins: ${AUTH_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002}
       seoNoIndex: true
 
 

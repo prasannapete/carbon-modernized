@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: authserver
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  serviceName: authserver
+  selector:
+    matchLabels:
+      type: auth-server
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: srl-auth-server
+        client: carbon
+        type: auth-server
+    spec:
+      nodeSelector:
+        doks.digitalocean.com/node-pool: nonprod
+      imagePullSecrets:
+        - name: pete-container-registry
+      containers:
+        - name: srl-auth-server
+          image: prasannapete/srl-auth-server
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9201
+              protocol: TCP
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError
+            # carbon-modernized property names that differ from the shared srl-config-map
+            # keys. Mapped here so srl-config-map (also read by srl-playmobil-service)
+            # is never edited.
+            - name: MAIL_USERNAME
+              valueFrom: {configMapKeyRef: {name: srl-config-map, key: MAIL_USER_NAME}}
+            - name: SENDGRID_API_KEY
+              valueFrom: {configMapKeyRef: {name: srl-config-map, key: SEND_GRID_KEY}}
+            - name: MAIL_FROM_EMAIL_ID
+              valueFrom: {configMapKeyRef: {name: srl-config-map, key: SRL_MAIL_FROM_EMAIL_ID}}
+            - name: ACCESS_TOKEN_URL
+              valueFrom: {configMapKeyRef: {name: srl-config-map, key: ACCESS_TOKEN_URI}}
+            - name: CLIENT_TOKEN_URL
+              valueFrom: {configMapKeyRef: {name: srl-config-map, key: Client_TOKEN_URL}}
+          envFrom:
+            - configMapRef:
+                name: srl-config-map
+            - configMapRef:
+                name: carbon-modernized-config
+          resources:
+            requests:
+              cpu: 20m
+              memory: 384Mi
+            limits:
+              memory: 640Mi
+          startupProbe:
+            tcpSocket: {port: 9201}
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: {port: 9201}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: {port: 9201}
+            periodSeconds: 20
+            failureThreshold: 6

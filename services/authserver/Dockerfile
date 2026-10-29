@@ -1,16 +1,15 @@
-FROM --platform=linux/amd64 ubuntu
-RUN apt-get update && \
-    apt-get install -y openjdk-25-jre-headless && \
-    rm -rf /var/lib/apt/lists/
+FROM --platform=linux/amd64 eclipse-temurin:25-jre
 LABEL maintainer="sharanya@prapticonsulting.com"
 VOLUME /tmp
 EXPOSE 9201
+# Thymeleaf templates and static assets (AUTH_RES_*_PATH=file:///res/... in srl-config-map)
 COPY res /res
+# Upload directory (FILE_UPLOAD_PATH=/res/uploads/ in srl-config-map)
+RUN mkdir -p /res/uploads/
+
 ARG JAR_FILE=target/authserver-0.0.1-SNAPSHOT.jar
-ARG CONFIG_FILE=authserver.yml
-ADD ${JAR_FILE} auth-service.jar
-ADD ${CONFIG_FILE} config.yml
+COPY ${JAR_FILE} /app/authserver.jar
 
-ENTRYPOINT ["java","-jar",  "-Dspring.config.location=/config.yml","auth-service.jar"]
-
-# prasannapete/srl-auth-server
+# JVM flags come from JAVA_TOOL_OPTIONS on the k8s Deployment; the JDK's bundled
+# truststore is used (the old /etc/ssl/certs/java/cacerts override does not exist here).
+ENTRYPOINT ["java", "-jar", "/app/authserver.jar"]

@@ -1,23 +1,19 @@
-FROM --platform=linux/amd64  node:lts
+# Build stage
+FROM --platform=linux/amd64 node:22-alpine AS build
 LABEL authors="sharanya"
-EXPOSE 5173
-
 WORKDIR /carbon
-ADD  package-prod.json /carbon/package.json
-ADD  .env /carbon/.env
-RUN npm install --legacy-peer-deps
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 COPY . .
+RUN npm run build
 
-ENV DISABLE_ESLINT_PLUGIN=true
-RUN CI=true npm run build
-ENTRYPOINT ["npm","run","dev"]
+# Runtime stage: nginx serves dist/ and does what the Vite dev proxy does
+# (/leaderboard -> common-service). PORT matches the existing srl-web-np targetPort (9204).
+FROM --platform=linux/amd64 nginx:1.27-alpine
+ENV PORT=9204 \
+    COMMON_UPSTREAM=http://srl-common-service-np
+COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /carbon/dist /usr/share/nginx/html
+EXPOSE 9204
 
-
-# Runtime stage
-#FROM nginx:1.27-alpine
-#COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
-#COPY --from=build /app/build /usr/share/nginx/html
-#EXPOSE 80
-#HEALTHCHECK CMD wget -qO- http://127.0.0.1/ || exit 1
-
- # prasannapete/srl-dashboard
+# prasannapete/srl-web-application

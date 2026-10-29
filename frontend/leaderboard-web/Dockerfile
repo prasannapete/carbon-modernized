@@ -1,23 +1,25 @@
-FROM --platform=linux/amd64  node:lts
+# Build stage: Vite bakes VITE_* in at build time; the env file picks the target
+# (.env-dev -> srl-dev auth URL).
+FROM --platform=linux/amd64 node:22-alpine AS build
 LABEL authors="sharanya"
-EXPOSE 3002
-
 WORKDIR /carbon
-ADD  package-prod.json /carbon/package.json
-ADD  .env-prod /carbon/.env
-RUN npm install --legacy-peer-deps
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 COPY . .
+ARG ENV_FILE=.env-dev
+RUN cp "${ENV_FILE}" .env
+RUN npm run build
 
-ENV DISABLE_ESLINT_PLUGIN=true
-RUN CI=true npm run build
-ENTRYPOINT ["npm","run" ,"dev"]
+# Runtime stage: nginx serves dist/ and does what the Vite dev proxy does
+# (/api -> kitkat-service, /oauth2/token -> authserver), so the browser stays
+# same-origin and needs no CORS changes on the shared ingresses.
+# PORT matches the existing srl-leaderboard-web-np targetPort (9111).
+FROM --platform=linux/amd64 nginx:1.27-alpine
+ENV PORT=9111 \
+    KITKAT_UPSTREAM=http://srl-kitkat-service-np \
+    AUTH_UPSTREAM=http://srl-auth-server-service-np
+COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /carbon/dist /usr/share/nginx/html
+EXPOSE 9111
 
-
-# Runtime stage
-#FROM nginx:1.27-alpine
-#COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
-#COPY --from=build /app/build /usr/share/nginx/html
-#EXPOSE 80
-#HEALTHCHECK CMD wget -qO- http://127.0.0.1/ || exit 1
-
- # prasannapete/srl-dashboard
+# prasannapete/srl-leaderboard-web-application

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: srl-web
+  labels:
+    app: srl-web
+    client: carbon
+    type: srl-web
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: srl-web
+  # Replace in place: no surge pod, so the over-committed nonprod pool never has to
+  # fit an extra pod next to srl-playmobil-service.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: srl-web
+    spec:
+      nodeSelector:
+        doks.digitalocean.com/node-pool: nonprod
+      imagePullSecrets:
+        - name: pete-container-registry
+      containers:
+        - name: srl-web-application
+          image: prasannapete/srl-web-application
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9204
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          startupProbe:
+            tcpSocket: {port: 9204}
+            periodSeconds: 10
+            failureThreshold: 12
+          readinessProbe:
+            tcpSocket: {port: 9204}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: {port: 9204}
+            periodSeconds: 20
+            failureThreshold: 6
