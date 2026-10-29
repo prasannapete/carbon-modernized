@@ -75,6 +75,30 @@ public class SecurityConfig {
     @Autowired
     CBConfig cbConfig;
 
+    /** scheme://host[:port] of an absolute http(s) URL, or null if it is not one. */
+    static String originOf(String url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            String scheme = uri.getScheme();
+            if (uri.getHost() == null || uri.getRawUserInfo() != null
+                    || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+                return null;
+            }
+            return scheme.toLowerCase(Locale.ROOT) + "://" + uri.getHost().toLowerCase(Locale.ROOT)
+                    + (uri.getPort() == -1 ? "" : ":" + uri.getPort());
+        } catch (java.net.URISyntaxException e) {
+            return null;
+        }
+    }
+
+    private boolean isAllowedOrigin(String origin) {
+        return origin != null && cbConfig.getAllowedOrigins().stream()
+                .anyMatch(allowed -> allowed.equalsIgnoreCase(origin));
+    }
+
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
@@ -137,16 +161,13 @@ public class SecurityConfig {
                         // session cookie (SRLSESSION), and return to the dashboard so it re-authenticates.
                         logout.logoutRequestMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/logout"))
                                 // Default target is the SRL Dashboard (unchanged). A caller may pass
-                                // ?redirect=<url> to return elsewhere after logout, but ONLY for known
-                                // local app origins (SRL Dashboard 3000, playMobil 3001, Leaderboard Web
-                                // 3002) so each SPA can return to its own login instead of the dashboard.
-                                // Restricting to those origins keeps this from being an open redirect.
+                                // ?redirect=<url> to return elsewhere after logout, but ONLY when its
+                                // origin is exactly one of the allowed SPA origins (AUTH_ALLOWED_ORIGINS),
+                                // so each SPA can return to its own login instead of the dashboard.
+                                // Exact origin matching keeps this from being an open redirect.
                                 .logoutSuccessHandler((request, response, authentication) -> {
                                     String redirect = request.getParameter("redirect");
-                                    String target = (redirect != null
-                                            && (redirect.startsWith("http://localhost:3000")
-                                                || redirect.startsWith("http://localhost:3001")
-                                                || redirect.startsWith("http://localhost:3002")))
+                                    String target = isAllowedOrigin(originOf(redirect))
                                             ? redirect
                                             : cbConfig.getLoginRedirectURL();
                                     response.sendRedirect(target);
@@ -165,12 +186,13 @@ public class SecurityConfig {
      * exchange from the browser against the OAuth2 endpoints. SRL Dashboard (3000),
      * playMobil (3001) and Leaderboard Web (3002) each proxy the token call so the
      * authserver sees their http://localhost:<port> Origin — all three must be allowed
-     * or the token POST is rejected at the CORS layer with 403.
+     * or the token POST is rejected at the CORS layer with 403. Deployed environments
+     * set their own SPA origins through AUTH_ALLOWED_ORIGINS.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:3002"));
+        configuration.setAllowedOrigins(cbConfig.getAllowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);

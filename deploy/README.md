@@ -67,6 +67,7 @@ deploy/scripts/deploy-srl-dev.sh --apply
 
 ## Before the first apply
 
-- **OAuth redirect URI.** Register `https://leaderboard.prapticonsulting.com/oauth2/callback` on the `srl-analytics` client in the srl-dev authserver database. leaderboard-web now does its own authorization-code login.
-- **Database migrations.** Review the `maintenance/db-patcher` changesets. The srl-dev database `srl_analytics_dev` is shared with `srl-playmobil-service`, so changes must be additive only.
+- **OAuth redirect URI.** Done 2026-10-29: `https://leaderboard.prapticonsulting.com/oauth2/callback` was appended to the `srl-analytics` client's `redirect_uris` in `oauth2_registered_client` (existing URIs untouched; the old row is backed up under `~/.local/state/carbon-srl-dev-backups/`).
+- **Database migrations.** Checked 2026-10-29: `srl_analytics_dev` already has everything the services map (all `@Table`s, `srl_tenant`, every `tenant_id` column from `bootstrap_carbon.sql`), and no service changes the schema at startup (no `ddl-auto`, Liquibase or Flyway). Nothing to run. Any future change must stay additive, because `srl-playmobil-service` shares this database.
+- **Authserver origins.** The authserver now enforces CORS itself, and only for `AUTH_ALLOWED_ORIGINS` (also the post-logout redirect allowlist). `carbon-modernized-config` sets it to the origins from the `srl-auth-server-np-ingress` CORS annotation plus leaderboard-web; keep the two in step.
 - **Play Store reports.** `PLAYSTORE_JSON_FILE_PATH` is empty, so Play Store report fetching in shell-analytics won't work in srl-dev until a service-account JSON is mounted.
