@@ -10,6 +10,16 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # User-uploaded files (event logos) come back same-origin through /api, and kitkat
+    # keeps the uploader's extension and serves them inline. Sandbox them so an uploaded
+    # HTML/SVG can't run script on this origin (where the access token lives).
+    location /api/carbon-events/files/ {
+        proxy_pass ${KITKAT_UPSTREAM}/carbon-events/files/;
+        proxy_hide_header Content-Security-Policy;
+        add_header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
     # Authorization-code token exchange
     location = /oauth2/token {
         proxy_pass ${AUTH_UPSTREAM}/oauth2/token;
