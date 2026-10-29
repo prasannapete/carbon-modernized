@@ -1,0 +1,164 @@
+# Build carbon-modernized from main and deploy it to srl-dev on the carbon cluster.
+#
+# Production is out of reach by construction:
+#   - images are pushed only as the commit's short SHA (build-images.sh refuses latest,
+#     v0.0.1 and playmobil repos); srl-prod runs :v0.0.1
+#   - the cluster credential is the carbon-modernized-deployer ServiceAccount
+#     (deploy/k8s/ci-rbac), which can patch only carbon-modernized's own srl-dev objects
+#     and cannot see srl-prod at all; the preflight below fails the run if it can do more
+#   - deploy-srl-dev.sh still rejects manifests outside srl-dev or mentioning playmobil,
+#     and fails if srl-playmobil-service changes during the deploy
+#
+# One-time setup: deploy/scripts/setup-deploy-dev-ci.sh (see deploy/README.md).
+name: Deploy to dev
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "maintenance/**"
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits for the running one instead of cancelling
+# it half-way through a rollout.
+concurrency:
+  group: deploy-srl-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and push images
+    if: github.repository == 'prasannapete/carbon-modernized' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 45
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: tag
+        run: echo "tag=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Build everything before logging in, so no build step (Maven plugins, npm scripts)
+      # runs while the registry credential is on the runner.
+      - name: Build (tag ${{ steps.tag.outputs.tag }})
+        run: bash deploy/scripts/build-images.sh
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # The token can write any prasannapete repo, and srl-prod pulls :v0.0.1 from some of
+      # these. build-images.sh never pushes v0.0.1/latest; this proves the run didn't.
+      - name: Record production tags
+        run: |
+          snapshot() {
+            for repo in $(bash deploy/scripts/build-images.sh --list-repos); do
+              for t in v0.0.1 latest; do
+                d=$(docker buildx imagetools inspect "$repo:$t" --format '{{.Manifest.Digest}}' 2>/dev/null || echo absent)
+                echo "$repo:$t $d"
+              done
+            done
+          }
+          declare -f snapshot > "$RUNNER_TEMP/snapshot.sh"
+          snapshot | tee "$RUNNER_TEMP/tags-before"
+
+      - name: Push
+        run: bash deploy/scripts/build-images.sh --push-only
+
+      - name: Verify production tags unchanged
+        run: |
+          source "$RUNNER_TEMP/snapshot.sh"
+          snapshot > "$RUNNER_TEMP/tags-after"
+          if ! diff "$RUNNER_TEMP/tags-before" "$RUNNER_TEMP/tags-after"; then
+            echo "::error::v0.0.1/latest tags changed during this run - check Docker Hub now"
+            exit 1
+          fi
+          echo "v0.0.1 and latest tags unchanged."
+
+  deploy:
+    name: Deploy to srl-dev
+    needs: build
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 30
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      KUBE_CONTEXT: carbon-srl-dev-deployer
+      CHECK_SRL_PROD: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
+        with:
+          version: v1.34.12
+
+      - name: Write kubeconfig
+        env:
+          SRL_DEV_KUBECONFIG: ${{ secrets.SRL_DEV_KUBECONFIG }}
+        run: |
+          umask 077
+          printf '%s' "$SRL_DEV_KUBECONFIG" > "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      # Refuse to run with a credential that could reach production or playmobil.
+      - name: Preflight - credential is limited to carbon-modernized in srl-dev
+        run: |
+          can() { kubectl --context="$KUBE_CONTEXT" auth can-i "$@" 2>/dev/null || true; }
+          expect() { # expect <yes|no> <can-i args...>
+            want=$1; shift
+            got=$(can "$@")
+            echo "can-i $* -> $got (want $want)"
+            [ "$got" = "$want" ] || { echo "::error::deployer credential is wrong for: $*"; exit 1; }
+          }
+          expect yes patch deployment/srl-common-service -n srl-dev
+          expect yes patch statefulset/authserver -n srl-dev
+          expect no  patch deployment/srl-playmobil-service -n srl-dev
+          expect no  patch configmap/srl-config-map -n srl-dev
+          expect no  create deployments -n srl-dev
+          expect no  delete deployments -n srl-dev
+          expect no  patch ingresses -n srl-dev
+          expect no  get deployments -n srl-prod
+          expect no  patch deployments -n srl-prod
+          expect no  patch statefulsets -n srl-prod
+          expect no  '*' '*' -n srl-prod
+
+      - name: Diff
+        run: bash deploy/scripts/deploy-srl-dev.sh "$TAG"
+
+      - name: Apply
+        env:
+          BACKUP_DIR: ${{ runner.temp }}/backups
+        run: bash deploy/scripts/deploy-srl-dev.sh "$TAG" --apply
+
+      # The backup holds only carbon-modernized's own objects (no srl-config-map values).
+      - name: Keep pre-deploy backup
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: srl-dev-backup-${{ env.TAG }}
+          path: ${{ runner.temp }}/backups
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Remove kubeconfig
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kubeconfig"

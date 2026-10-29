@@ -1,0 +1,72 @@
+# Identity the deploy-dev GitHub workflow uses on the carbon cluster.
+#
+# It can change only the objects carbon-modernized owns in srl-dev, and read what the
+# deploy script needs to wait and verify. It has no access to srl-prod, to
+# srl-playmobil-service, to srl-config-map, or to Services/Ingresses, so a workflow
+# run cannot touch production or playmobil whatever the manifests say.
+#
+# Applied once by an admin (deploy/scripts/setup-deploy-dev-ci.sh), never by the workflow.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: carbon-modernized-deployer
+  namespace: srl-dev
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: carbon-modernized-deployer
+  namespace: srl-dev
+rules:
+  # Read workloads and pods: kubectl diff/apply lookups, rollout status, and the
+  # playmobil before/after snapshot.
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Change only carbon-modernized's own objects (they already exist, so no create).
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames:
+      - srl-common-service
+      - srl-shell-analytics-service
+      - srl-kitkat-service
+      - srl-dashboard
+      - srl-leaderboard-web
+      - srl-web
+    verbs: ["patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    resourceNames: ["authserver"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["carbon-modernized-config"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: carbon-modernized-deployer
+  namespace: srl-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: carbon-modernized-deployer
+subjects:
+  - kind: ServiceAccount
+    name: carbon-modernized-deployer
+    namespace: srl-dev
+---
+# Long-lived token for the workflow's kubeconfig. Rotate by deleting this Secret and
+# re-running the setup script.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: carbon-modernized-deployer-token
+  namespace: srl-dev
+  annotations:
+    kubernetes.io/service-account.name: carbon-modernized-deployer
+type: kubernetes.io/service-account-token
