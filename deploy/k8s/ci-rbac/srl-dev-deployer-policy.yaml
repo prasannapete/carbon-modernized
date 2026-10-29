@@ -1,0 +1,66 @@
+# Admission policy for the CI deployer (srl-dev-deployer.yaml).
+#
+# RBAC limits WHICH objects the deployer may patch; this limits WHAT the patched pod
+# template may contain, so a leaked CI credential can't turn one of those workloads into
+# a way out of srl-dev (privileged/host access, other Secrets or ServiceAccount tokens,
+# prod nodes, or another Service's traffic). It applies only to requests made by that
+# ServiceAccount, so no other user, namespace or workload is affected.
+#
+# Cluster-scoped. Applied once by an admin (deploy/scripts/setup-deploy-dev-ci.sh).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: carbon-modernized-deployer-pod-template
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: srl-dev
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "statefulsets"]
+  matchConditions:
+    - name: only-the-ci-deployer
+      expression: "request.userInfo.username == 'system:serviceaccount:srl-dev:carbon-modernized-deployer'"
+  variables:
+    - name: pod
+      expression: "object.spec.template.spec"
+    - name: allowedConfigMaps
+      expression: "['srl-config-map', 'carbon-modernized-config']"
+  validations:
+    - expression: "oldObject != null && object.spec.template.metadata.labels == oldObject.spec.template.metadata.labels"
+      message: "pod template labels may not change (they decide which Service routes to the pods)"
+    - expression: "has(variables.pod.nodeSelector) && variables.pod.nodeSelector['doks.digitalocean.com/node-pool'] == 'nonprod' && !has(variables.pod.affinity) && !has(variables.pod.tolerations) && !has(variables.pod.nodeName)"
+      message: "pods must run on the nonprod node pool"
+    - expression: "(!has(variables.pod.serviceAccountName) || variables.pod.serviceAccountName == 'default') && (!has(variables.pod.serviceAccount) || variables.pod.serviceAccount == 'default')"
+      message: "pods must use the default ServiceAccount"
+    - expression: "!has(variables.pod.volumes) && !has(variables.pod.initContainers) && !has(variables.pod.ephemeralContainers)"
+      message: "volumes, init containers and ephemeral containers are not allowed"
+    # The API server defaults the pod securityContext to {}, so only its risky field is checked.
+    - expression: "!(has(variables.pod.hostNetwork) && variables.pod.hostNetwork) && !(has(variables.pod.hostPID) && variables.pod.hostPID) && !(has(variables.pod.hostIPC) && variables.pod.hostIPC) && !(has(variables.pod.securityContext) && has(variables.pod.securityContext.sysctls))"
+      message: "host namespaces and sysctls are not allowed"
+    - expression: "!has(variables.pod.imagePullSecrets) || variables.pod.imagePullSecrets.all(s, s.name == 'pete-container-registry')"
+      message: "only the pete-container-registry pull secret is allowed"
+    - expression: "variables.pod.containers.all(c, c.image.matches('^prasannapete/srl-[a-z-]+:[0-9a-f]{7}$'))"
+      message: "images must be prasannapete/srl-* tagged with a 7-character commit SHA"
+    - expression: "variables.pod.containers.all(c, !has(c.securityContext) && !has(c.volumeMounts) && !has(c.volumeDevices))"
+      message: "container securityContext overrides and mounts are not allowed"
+    - expression: "variables.pod.containers.all(c, !has(c.envFrom) || c.envFrom.all(e, !has(e.secretRef) && has(e.configMapRef) && e.configMapRef.name in variables.allowedConfigMaps))"
+      message: "envFrom may only reference srl-config-map or carbon-modernized-config"
+    - expression: "variables.pod.containers.all(c, !has(c.env) || c.env.all(e, !has(e.valueFrom) || (has(e.valueFrom.configMapKeyRef) && e.valueFrom.configMapKeyRef.name in variables.allowedConfigMaps)))"
+      message: "env may only reference srl-config-map or carbon-modernized-config (no Secrets)"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: carbon-modernized-deployer-pod-template
+spec:
+  policyName: carbon-modernized-deployer-pod-template
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: srl-dev

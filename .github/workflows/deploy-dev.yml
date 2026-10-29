@@ -54,13 +54,18 @@ jobs:
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
+      # Build everything before logging in, so no build step (Maven plugins, npm scripts)
+      # runs while the registry credential is on the runner.
+      - name: Build (tag ${{ steps.tag.outputs.tag }})
+        run: bash deploy/scripts/build-images.sh
+
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push (tag ${{ steps.tag.outputs.tag }})
-        run: bash deploy/scripts/build-images.sh --push
+      - name: Push
+        run: bash deploy/scripts/build-images.sh --push-only
 
   deploy:
     name: Deploy to srl-dev

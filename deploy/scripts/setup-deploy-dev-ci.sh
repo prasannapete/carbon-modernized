@@ -4,7 +4,8 @@
 #
 #   deploy/scripts/setup-deploy-dev-ci.sh
 #
-# 1. applies deploy/k8s/ci-rbac (ServiceAccount + srl-dev Role + token; nothing in srl-prod)
+# 1. applies deploy/k8s/ci-rbac: an admission policy that only checks the deployer's own
+#    requests, then the ServiceAccount + srl-dev Role + token (nothing in srl-prod)
 # 2. builds a kubeconfig for that ServiceAccount
 # 3. creates the GitHub environment "dev", deployable from main only
 # 4. stores SRL_DEV_KUBECONFIG and DOCKERHUB_USERNAME as dev environment secrets
@@ -23,12 +24,16 @@ REPO=${REPO:-prasannapete/carbon-modernized}
 ENVIRONMENT=dev
 ROOT=$(git rev-parse --show-toplevel)
 RBAC="$ROOT/deploy/k8s/ci-rbac/srl-dev-deployer.yaml"
+POLICY="$ROOT/deploy/k8s/ci-rbac/srl-dev-deployer-policy.yaml"
 
 die() { echo "ABORT: $*" >&2; exit 1; }
 k() { kubectl --context="$ADMIN_CONTEXT" "$@"; }
 
 # The RBAC file must only ever create objects in srl-dev.
 grep -E '^\s*namespace:' "$RBAC" | grep -vq "namespace: $NS\$" && die "$RBAC has objects outside $NS"
+
+echo "==> Applying CI deployer admission policy (applies only to $SA's requests)"
+k apply -f "$POLICY"
 
 echo "==> Applying CI deployer RBAC to $NS on context $ADMIN_CONTEXT"
 k apply -f "$RBAC"
