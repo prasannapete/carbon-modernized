@@ -56,9 +56,11 @@ if ! $APPLY; then
   exit 0
 fi
 
-backup="$ROOT/deploy/backups/srl-dev-$(date +%Y%m%d-%H%M%S).yaml"
-mkdir -p "$(dirname "$backup")"
-k -n "$NS" get deploy,sts,cm -o yaml >"$backup"
+# srl-config-map holds credentials, so the backup lives outside the repo, owner-only.
+backup_dir="${XDG_STATE_HOME:-$HOME/.local/state}/carbon-srl-dev-backups"
+(umask 077; mkdir -p "$backup_dir")
+backup="$backup_dir/srl-dev-$(date +%Y%m%d-%H%M%S).yaml"
+(umask 077; k -n "$NS" get deploy,sts,cm -o yaml >"$backup")
 echo "Backup written to $backup"
 
 # authserver first: the other services fetch its JWKS.

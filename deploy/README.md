@@ -63,7 +63,7 @@ deploy/scripts/deploy-srl-dev.sh
 deploy/scripts/deploy-srl-dev.sh --apply
 ```
 
-**Rollback:** `kubectl --context=carbon -n srl-dev rollout undo deploy/<name>` (or `sts/authserver`). Each run also writes a full YAML backup to `deploy/backups/`, which is git-ignored.
+**Rollback:** `kubectl --context=carbon -n srl-dev rollout undo deploy/<name>` (or `sts/authserver`). Each run also writes a full YAML backup to `~/.local/state/carbon-srl-dev-backups/`, readable only by you because it includes the credentials stored in `srl-config-map`.
 
 ## Before the first apply
 
