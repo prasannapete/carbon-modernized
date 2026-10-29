@@ -13,9 +13,11 @@ ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 BUILD=true
 PUSH=false
+LIST=false
 case "${1:-}" in
   --push) PUSH=true ;;
   --push-only) BUILD=false; PUSH=true ;;
+  --list-repos) LIST=true ;;  # print the image repositories, one per line
 esac
 
 TAG=$(git rev-parse --short=7 HEAD)
@@ -34,6 +36,11 @@ IMAGES=(
   "prasannapete/srl-leaderboard-web-application|frontend/leaderboard-web|ENV_FILE=.env-dev"
   "prasannapete/srl-web-application|frontend/web|"
 )
+
+if $LIST; then
+  for entry in "${IMAGES[@]}"; do echo "${entry%%|*}"; done
+  exit 0
+fi
 
 for entry in "${IMAGES[@]}"; do
   repo=${entry%%|*}

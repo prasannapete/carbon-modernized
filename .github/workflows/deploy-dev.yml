@@ -64,8 +64,33 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # The token can write any prasannapete repo, and srl-prod pulls :v0.0.1 from some of
+      # these. build-images.sh never pushes v0.0.1/latest; this proves the run didn't.
+      - name: Record production tags
+        run: |
+          snapshot() {
+            for repo in $(bash deploy/scripts/build-images.sh --list-repos); do
+              for t in v0.0.1 latest; do
+                d=$(docker buildx imagetools inspect "$repo:$t" --format '{{.Manifest.Digest}}' 2>/dev/null || echo absent)
+                echo "$repo:$t $d"
+              done
+            done
+          }
+          declare -f snapshot > "$RUNNER_TEMP/snapshot.sh"
+          snapshot | tee "$RUNNER_TEMP/tags-before"
+
       - name: Push
         run: bash deploy/scripts/build-images.sh --push-only
+
+      - name: Verify production tags unchanged
+        run: |
+          source "$RUNNER_TEMP/snapshot.sh"
+          snapshot > "$RUNNER_TEMP/tags-after"
+          if ! diff "$RUNNER_TEMP/tags-before" "$RUNNER_TEMP/tags-after"; then
+            echo "::error::v0.0.1/latest tags changed during this run - check Docker Hub now"
+            exit 1
+          fi
+          echo "v0.0.1 and latest tags unchanged."
 
   deploy:
     name: Deploy to srl-dev

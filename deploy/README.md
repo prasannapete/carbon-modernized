@@ -75,7 +75,8 @@ Production cannot be reached from the workflow:
 - An admission policy (`srl-dev-deployer-policy.yaml`, matched only to that ServiceAccount's requests) limits what its patches may put in a pod template: `prasannapete/srl-*` images at a commit SHA, nonprod nodes only, the default ServiceAccount, no volumes, Secrets, host access or privileged settings, and unchanged pod labels (so it can't take over another Service's traffic).
 - A preflight step checks those limits with `kubectl auth can-i` and fails the run if the credential can do more.
 - Images are built before the workflow logs in to Docker Hub, so build steps never see the registry token.
-- Images are only ever tagged with a commit SHA; `latest`, `v0.0.1` and playmobil repositories are refused.
+- Images are only ever tagged with a commit SHA; `latest`, `v0.0.1` and playmobil repositories are refused. The workflow records the `v0.0.1`/`latest` digests of the repos it pushes to and fails if they change during the run.
+- Images stay on Docker Hub under `prasannapete`, where a personal access token can't be limited to some repositories: the CI token could technically write the `:v0.0.1` tags srl-prod pulls. The checks above make the workflow itself never do that; to make it impossible for the token too, turn on **immutable tags** (Docker Hub → repository → Settings) for `v0.0.1` on the production repositories.
 - The deploy script's checks still apply. In CI it skips the srl-prod snapshot (`CHECK_SRL_PROD=false`) because the credential cannot read srl-prod.
 
 Every deploy restarts all 7 workloads, including the authserver, whose signing keys are regenerated on start: anyone signed in to srl-dev (dashboard, leaderboard, srl-dev playmobil) has to sign in again.
@@ -86,7 +87,7 @@ Every deploy restarts all 7 workloads, including the authserver, whose signing k
 deploy/scripts/setup-deploy-dev-ci.sh
 ```
 
-It applies `deploy/k8s/ci-rbac/` (policy and RBAC), builds a kubeconfig for the ServiceAccount, creates the `dev` environment (deployable from `main` only), stores `SRL_DEV_KUBECONFIG` and `DOCKERHUB_USERNAME` there, and prompts for `DOCKERHUB_TOKEN`: a Docker Hub access token for `prasannapete` with Read & Write. To revoke CI access, delete `secret/carbon-modernized-deployer-token` (or the ServiceAccount) in srl-dev.
+It applies `deploy/k8s/ci-rbac/` (policy and RBAC), builds a kubeconfig for the ServiceAccount, creates the `dev` environment (deployable from `main` only), stores `SRL_DEV_KUBECONFIG` and `DOCKERHUB_USERNAME` there, and prompts for `DOCKERHUB_TOKEN`: a Docker Hub personal access token for `prasannapete` with **Read & Write** only (not Delete). To revoke CI access, delete `secret/carbon-modernized-deployer-token` (or the ServiceAccount) in srl-dev.
 
 ## Before the first apply
 

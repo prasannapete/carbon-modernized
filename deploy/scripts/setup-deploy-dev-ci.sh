@@ -9,7 +9,7 @@
 # 2. builds a kubeconfig for that ServiceAccount
 # 3. creates the GitHub environment "dev", deployable from main only
 # 4. stores SRL_DEV_KUBECONFIG and DOCKERHUB_USERNAME as dev environment secrets
-# 5. prompts you for DOCKERHUB_TOKEN (a Docker Hub access token with write access to the
+# 5. prompts you for DOCKERHUB_TOKEN (a Docker Hub access token, Read & Write only, for the
 #    prasannapete/srl-* repositories)
 #
 # Re-running is safe; it refreshes the kubeconfig secret. To rotate the cluster token,
@@ -99,7 +99,7 @@ gh secret set DOCKERHUB_USERNAME --repo "$REPO" --env "$ENVIRONMENT" --body pras
 if gh secret list --repo "$REPO" --env "$ENVIRONMENT" | grep -q '^DOCKERHUB_TOKEN'; then
   echo "DOCKERHUB_TOKEN already set; leaving it."
 else
-  echo "Paste a Docker Hub access token for prasannapete (Read & Write); input is hidden:"
+  echo "Paste a Docker Hub access token for prasannapete (Read & Write, not Delete); input is hidden:"
   gh secret set DOCKERHUB_TOKEN --repo "$REPO" --env "$ENVIRONMENT"
 fi
 
