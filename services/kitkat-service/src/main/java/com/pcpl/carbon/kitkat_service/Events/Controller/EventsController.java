@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -60,9 +61,18 @@ public class EventsController extends AbstractCRUDController<Events, EventsDTO, 
         List<ApplicationResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
             try {
-                String original = file.getOriginalFilename();
-                String ext = (original != null && original.contains("."))
-                        ? original.substring(original.lastIndexOf('.')) : "";
+                // Extension comes from the file's content, not the client's file name.
+                String ext;
+                try (InputStream in = file.getInputStream()) {
+                    ext = ImageUploads.detectExtension(in.readNBytes(ImageUploads.HEADER_LENGTH));
+                }
+                if (ext == null) {
+                    responses.add(ApplicationResponse.builder()
+                            .success(false)
+                            .error("Only PNG, JPEG, GIF or WebP images are allowed")
+                            .build());
+                    continue;
+                }
                 String fileName = System.nanoTime() + "_logo" + ext;
                 File dir = new File(pcplConfig.getExcelUploadPath());
                 if (!dir.exists()) {
@@ -93,13 +103,21 @@ public class EventsController extends AbstractCRUDController<Events, EventsDTO, 
             if (!file.exists() || !file.isFile()) {
                 return ResponseEntity.notFound().build();
             }
-            String contentType = Files.probeContentType(filePath);
+            // Only images render inline; anything else (generated excels, or older uploads
+            // with an arbitrary extension) is a download, so it can't run as a page.
+            String inlineType = ImageUploads.inlineContentType(safeName);
+            String contentType = inlineType;
+            if (contentType == null) {
+                contentType = Files.probeContentType(filePath);
+            }
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
+            String disposition = inlineType != null ? "inline" : "attachment";
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + safeName + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"" + safeName + "\"")
+                    .header("X-Content-Type-Options", "nosniff")
                     .body(new FileSystemResource(file));
         } catch (Exception ex) {
             logger.error(ex.getMessage(), ex);

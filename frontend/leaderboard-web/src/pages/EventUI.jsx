@@ -80,9 +80,13 @@ export default function EventUI() {
       .then((response) => {
         if (Array.isArray(response) && response[0] && response[0].success) {
           setLogoPath(response[0].excelUploadPath);
+          setErrors((prev) => ({ ...prev, logo: undefined }));
+        } else {
+          const error = Array.isArray(response) && response[0] && response[0].error;
+          setErrors((prev) => ({ ...prev, logo: error || 'Logo upload failed' }));
         }
       })
-      .catch(() => {});
+      .catch(() => setErrors((prev) => ({ ...prev, logo: 'Logo upload failed' })));
   };
 
   const onDrop = (e) => {
@@ -288,6 +292,7 @@ export default function EventUI() {
                       <p><small>Valid High Definition Image</small></p>
                     </div>
                   </div>
+                  {errors.logo && <div className="field-validation-error">{errors.logo}</div>}
                 </div>
               </div>
 
