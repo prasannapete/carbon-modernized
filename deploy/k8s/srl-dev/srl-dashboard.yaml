@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: srl-dashboard
+  labels:
+    app: srl-dashboard
+    client: carbon
+    type: srl-dashboard
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: srl-dashboard
+  # Replace in place: no surge pod, so the over-committed nonprod pool never has to
+  # fit an extra pod next to srl-playmobil-service.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: srl-dashboard
+    spec:
+      nodeSelector:
+        doks.digitalocean.com/node-pool: nonprod
+      imagePullSecrets:
+        - name: pete-container-registry
+      containers:
+        - name: srl-dashboard-application
+          image: prasannapete/srl-dashboard
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          startupProbe:
+            tcpSocket: {port: 3000}
+            periodSeconds: 10
+            failureThreshold: 12
+          readinessProbe:
+            tcpSocket: {port: 3000}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: {port: 3000}
+            periodSeconds: 20
+            failureThreshold: 6

@@ -1,0 +1,15 @@
+# Settings the carbon-modernized backends need that srl-config-map doesn't have.
+# Non-secret only. Loaded after srl-config-map, so a key here wins over the shared one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: carbon-modernized-config
+data:
+  # Links in shell-analytics emails
+  APP_BASE_URL: https://srl-dev-dashboard.prapticonsulting.com
+  PLAY_MOBIL_HOME_URL: ""
+  # 1 = SendGrid, 2 = SMTP (MAIL_HOST/MAIL_* in srl-config-map)
+  MAIL_CLIENT_TYPE: "2"
+  # Play Store service-account JSON; not mounted in srl-dev yet, so Play Store
+  # report fetching in shell-analytics is unavailable there.
+  PLAYSTORE_JSON_FILE_PATH: ""

@@ -36,7 +36,7 @@ spring:
     cache: false
   web:
     resources:
-      static-locations: ${AUTH_RES_STATIC _PATH:file:///@project.basedir@/res/static/}
+      static-locations: ${AUTH_RES_STATIC_PATH:file:///@project.basedir@/res/static/}
 com:
   pcpl:
     carbon:

@@ -1,26 +1,14 @@
-FROM --platform=linux/amd64 eclipse-temurin:25-jdk
-
+FROM --platform=linux/amd64 eclipse-temurin:25-jre
 LABEL maintainer="sharanya@prapticonsulting.com"
-
-# Ensure CA certificates are present for HTTPS trust
-RUN apt-get update && \
-    apt-get install -y ca-certificates && \
-    update-ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-
 VOLUME /tmp
 EXPOSE 9203
 
-# Create upload directory
+# Upload directory (FILE_UPLOAD_PATH=/res/uploads/ in srl-config-map)
 RUN mkdir -p /res/uploads/
 
-# Copy the application JAR
 ARG JAR_FILE=target/shell-analytics-service-0.0.1-SNAPSHOT.jar
-ADD ${JAR_FILE} shell-analytics-service.jar
+COPY ${JAR_FILE} /app/shell-analytics-service.jar
 
-# Optional: explicitly define trustStore (avoids trustAnchors issues)
-ENV JAVA_OPTS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts \
-               -Djavax.net.ssl.trustStorePassword=changeit"
-
-# Run Spring Boot app
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar shell-analytics-service.jar"]
+# JVM flags come from JAVA_TOOL_OPTIONS on the k8s Deployment; the JDK's bundled
+# truststore is used (the old /etc/ssl/certs/java/cacerts override does not exist here).
+ENTRYPOINT ["java", "-jar", "/app/shell-analytics-service.jar"]
