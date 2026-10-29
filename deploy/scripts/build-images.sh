@@ -37,6 +37,9 @@ for entry in "${IMAGES[@]}"; do
   fi
 done
 
+# The services use pcpl-sdk as a system-scope jar from library/jars (not in git), which
+# Maven doesn't treat as a build dependency, so build it first or a clean checkout fails.
+sh services/authserver/mvnw -q -f "$ROOT/pom.xml" -pl library/pcpl-sdk -DskipTests package
 sh services/authserver/mvnw -q -f "$ROOT/pom.xml" -pl services/authserver,services/common-service,services/shell-analytics-service,services/kitkat-service \
   -am -DskipTests package
 

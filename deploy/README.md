@@ -63,7 +63,28 @@ deploy/scripts/deploy-srl-dev.sh
 deploy/scripts/deploy-srl-dev.sh --apply
 ```
 
-**Rollback:** `kubectl --context=carbon -n srl-dev rollout undo deploy/<name>` (or `sts/authserver`). Each run also writes a full YAML backup to `~/.local/state/carbon-srl-dev-backups/`, readable only by you because it includes the credentials stored in `srl-config-map`.
+**Rollback:** `kubectl --context=carbon -n srl-dev rollout undo deploy/<name>` (or `sts/authserver`), or redeploy an earlier commit's tag. Each apply also writes a YAML backup of the objects it manages (their state before the apply) to `~/.local/state/carbon-srl-dev-backups/`, owner-only.
+
+## Automatic deploys (GitHub Actions)
+
+`.github/workflows/deploy-dev.yml` runs on every push to `main` (Markdown-only and `maintenance/` changes excepted) and from **Actions → Deploy to dev → Run workflow**. It builds the 7 images, pushes them tagged with the commit's short SHA, then runs `deploy-srl-dev.sh` (diff, then `--apply`). Runs are queued, never run in parallel or cancelled mid-rollout.
+
+Production cannot be reached from the workflow:
+
+- The cluster credential is the `carbon-modernized-deployer` ServiceAccount (`deploy/k8s/ci-rbac/`). It can patch only the 7 carbon-modernized workloads and `carbon-modernized-config` in srl-dev, can read workloads and pods there, and has **no access to srl-prod**, `srl-playmobil-service`, `srl-config-map`, Services or Ingresses. It cannot create or delete anything. Nothing is created in srl-prod.
+- A preflight step checks those limits with `kubectl auth can-i` and fails the run if the credential can do more.
+- Images are only ever tagged with a commit SHA; `latest`, `v0.0.1` and playmobil repositories are refused.
+- The deploy script's checks still apply. In CI it skips the srl-prod snapshot (`CHECK_SRL_PROD=false`) because the credential cannot read srl-prod.
+
+Every deploy restarts all 7 workloads, including the authserver, whose signing keys are regenerated on start: anyone signed in to srl-dev (dashboard, leaderboard, srl-dev playmobil) has to sign in again.
+
+**One-time setup** (needs your carbon cluster admin context and `gh` login; nothing is printed):
+
+```bash
+deploy/scripts/setup-deploy-dev-ci.sh
+```
+
+It applies `deploy/k8s/ci-rbac/`, builds a kubeconfig for the ServiceAccount, creates the `dev` environment (deployable from `main` only), stores `SRL_DEV_KUBECONFIG` and `DOCKERHUB_USERNAME` there, and prompts for `DOCKERHUB_TOKEN`: a Docker Hub access token for `prasannapete` with Read & Write. To revoke CI access, delete `secret/carbon-modernized-deployer-token` (or the ServiceAccount) in srl-dev.
 
 ## Before the first apply
 
