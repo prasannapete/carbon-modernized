@@ -17,8 +17,10 @@ data:
   # logout). The dashboard has no token then, so it starts a fresh authorization request
   # and shows the login page. Overrides srl-config-map's http://localhost:3000.
   SRL_LOGIN_REDIRECT_URL: https://srl-dev-dashboard.prapticonsulting.com
-  # authserver CORS + post-logout redirect allowlist. Same origins as the
-  # srl-auth-server-np-ingress cors-allow-origin annotation (kept so existing
-  # dashboard/playmobil logins keep working), plus leaderboard-web, whose token
-  # call reaches the authserver through its own nginx rather than that ingress.
-  AUTH_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001,https://localhost:3001,https://srl-dev-api.prapticonsulting.com,https://srl-dev-dashboard.prapticonsulting.com,https://srl-dashboard.carbon12011ar.com,http://playmobil.carbon12011ar.com,https://playmobil.carbon12011ar.com,https://leaderboard.prapticonsulting.com"
+  # Browser origins allowed to call the authserver (CORS + post-logout redirect
+  # allowlist) and shell-analytics (CORS). Deployed dev frontends (srl-dev-dashboard,
+  # leaderboard), local dev servers (dashboard :3000, playMobil :3001,
+  # leaderboard-web :3002, http and https) and the existing prod frontends.
+  # Keep identical to the cors-allow-origin annotation on srl-dev's
+  # srl-api-ingress and srl-auth-server-np-ingress, which answer the preflights.
+  AUTH_ALLOWED_ORIGINS: "http://localhost:3000,https://localhost:3000,http://localhost:3001,https://localhost:3001,http://localhost:3002,https://localhost:3002,https://srl-dev-api.prapticonsulting.com,https://srl-dev-dashboard.prapticonsulting.com,https://leaderboard.prapticonsulting.com,https://srl-dashboard.carbon12011ar.com,http://playmobil.carbon12011ar.com,https://playmobil.carbon12011ar.com"
