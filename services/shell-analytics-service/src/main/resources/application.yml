@@ -25,6 +25,16 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      # Redis for the shell-events queue (save-events, ShellEventsScheduler). The deployments
+      # set REDIS_HOST/PORT/USERNAME/PASSWORD; without this mapping Spring Boot connects to
+      # localhost:6379. No password fallback: a local Redis normally runs without one.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      timeout: 60000
   mail:
     # SMTP settings for the JavaMailSender bean that SMTPMailClient requires.
     # All values come from the project-root .env (kept out of git).
