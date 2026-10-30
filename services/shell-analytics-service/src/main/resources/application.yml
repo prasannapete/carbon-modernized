@@ -80,6 +80,9 @@ com:
       homeUrl: ${SRL_HOME_URL:https://srl-dev-dashboard.prapticonsulting.com}
       loginRedirectURL: ${SRL_LOGIN_REDIRECT_URL:https://srl-dev-dashboard.prapticonsulting.com}
       seoNoIndex: true
+      # Browser origins (SRL Dashboard SPA) allowed to call this API cross-origin (CORS).
+      # Same AUTH_ALLOWED_ORIGINS list as the auth server; defaults to the local dashboards.
+      allowedOrigins: ${AUTH_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
       appBaseUrl: ${APP_BASE_URL}
       playMobilBaseUrl: ${PLAY_MOBIL_HOME_URL}
       accessTokenUrl: ${ACCESS_TOKEN_URL}

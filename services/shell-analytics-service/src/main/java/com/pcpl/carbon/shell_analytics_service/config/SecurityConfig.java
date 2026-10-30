@@ -1,5 +1,6 @@
 package com.pcpl.carbon.shell_analytics_service.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -45,12 +46,18 @@ public class SecurityConfig {
 
     /**
      * CORS for the SRL Dashboard SPA, which calls this service from the browser
-     * (cross-origin) with the auth server's Bearer token.
+     * (cross-origin) with the auth server's Bearer token. The allowed origins come from
+     * {@code com.pcpl.carbon.allowedOrigins} (AUTH_ALLOWED_ORIGINS, as for the auth server),
+     * so each environment lists its own dashboard origin.
      */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${com.pcpl.carbon.allowedOrigins}") List<String> allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3001"));
+        configuration.setAllowedOrigins(allowedOrigins.stream()
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
         configuration.setAllowedMethods(List.of("HEAD", "GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setExposedHeaders(List.of("Content-Disposition"));
