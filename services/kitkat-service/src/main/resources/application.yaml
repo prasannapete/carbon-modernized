@@ -33,6 +33,16 @@ spring:
           # Provides the JwtDecoder bean that SecurityConfig's oauth2ResourceServer().jwt()
           # requires, from the auth server's JWKS endpoint (as in shell-analytics).
           jwk-set-uri: ${JWK_SET_URI:http://localhost:9201/oauth2/jwks}
+  data:
+    redis:
+      # Redis for the kitkat events queue (KitkatEventsServiceImpl, EventsScheduler). The deployments
+      # set REDIS_HOST/PORT/USERNAME/PASSWORD; without this mapping Spring Boot connects to
+      # localhost:6379. No password fallback: a local Redis normally runs without one.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      timeout: 60000
   mail:
     # SMTP settings for the JavaMailSender bean; values come from the project-root .env.
     host: ${MAIL_HOST}
