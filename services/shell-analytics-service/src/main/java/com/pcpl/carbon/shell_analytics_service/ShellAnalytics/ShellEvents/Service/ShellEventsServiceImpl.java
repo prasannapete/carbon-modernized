@@ -807,8 +807,8 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         carsHeaderStd(sheet, r++, s);
         for (Map<String, Object> car : cars) {
             put(sheet, r, 1, str(car.get("carName")), s.get("carName"));
-            put(sheet, r, 2, str(car.get("totalRacDurationInHours")), s.get("str"));
-            put(sheet, r, 3, str(car.get("cumulativeRacDurationInHours")), s.get("str"));
+            put(sheet, r, 2, formatDuration(Math.round(toDouble(car.get("totalRcDuration")))), s.get("str"));
+            put(sheet, r, 3, formatDuration(Math.round(toDouble(car.get("cumulativeRcDuration")))), s.get("str"));
             r++;
         }
         put(sheet, r, 1, "Grand Total", s.get("gtLabel"));
@@ -917,9 +917,9 @@ public class ShellEventsServiceImpl implements ShellEventsService{
         for (String carName : carNames) {
             put(sheet, r, 1, carName, s.get("carName"));
             for (int i = 0; i < nw; i++) {
-                put(sheet, r, 2 + i, carFieldStr(race ? weekly.get(i).race : weekly.get(i).rc, code, name, carName, "totalRacDurationInHours"), s.get("str"));
+                put(sheet, r, 2 + i, formatDuration(Math.round(carField(race ? weekly.get(i).race : weekly.get(i).rc, code, name, carName, "totalRcDuration"))), s.get("str"));
             }
-            put(sheet, r, 2 + nw, carFieldStr(race ? full.race : full.rc, code, name, carName, "cumulativeRacDurationInHours"), s.get("str"));
+            put(sheet, r, 2 + nw, formatDuration(Math.round(carField(race ? full.race : full.rc, code, name, carName, "cumulativeRcDuration"))), s.get("str"));
             r++;
         }
         put(sheet, r, 1, "Grand Total", s.get("gtLabel"));

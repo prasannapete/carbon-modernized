@@ -66,6 +66,8 @@ public class CarUnlockedServiceImpl extends AbstractLazyService<CarUnlocked, Car
             SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
             Date startDate = formatter.parse(startDateStr);
             Date endDate = formatter.parse(endDateStr);
+            // Include the whole end day (up to 23:59:59.999) so events later on the end date are counted.
+            endDate = new Date(endDate.getTime() + 86399999L);
             if (countries != null && !countries.trim().isEmpty()) {
                 countryList = Arrays.stream(countries.split(","))
                         .map(String::trim)
@@ -166,6 +168,8 @@ public class CarUnlockedServiceImpl extends AbstractLazyService<CarUnlocked, Car
             SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
             Date startDate = formatter.parse(startDateStr);
             Date endDate = formatter.parse(endDateStr);
+            // Include the whole end day (up to 23:59:59.999) so events later on the end date are counted.
+            endDate = new Date(endDate.getTime() + 86399999L);
             if (countries != null && !countries.trim().isEmpty()) {
                 countryList = Arrays.stream(countries.split(","))
                         .map(String::trim)

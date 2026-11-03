@@ -1,4 +1,5 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useMemo} from 'react';
+import CreatableSelect from 'react-select/creatable';
 import '../../css/Settings.css';
 import axiosInstance from "../../interceptors";
 import {useNavigate} from "react-router-dom";
@@ -11,6 +12,7 @@ import Navbar from "./Navbar";
 const Settings = () => {
     const [selectedCountry, setSelectedCountry] = useState('');
     const [cars, setCars] = useState([]);
+    const [unlockedCars, setUnlockedCars] = useState([]);
     const [countries, setCountries] = useState([]);
     const BASE_URL = process.env.REACT_APP_SHELL_ANALYTICS_SERVICE_BASE_URL;
     const dispatch = useDispatch();
@@ -39,13 +41,20 @@ const Settings = () => {
     useEffect(() => {
         if (!selectedCountry) {
             setCars([]);
+            setUnlockedCars([]);
             return;
         }
 
         const fetchCars = async () => {
             try {
-                const response = await axiosInstance.post(`${BASE_URL}/srl/master-cars/get-cars-unlocked`,{"countryCode":selectedCountry});
-                setCars(response.data.data); // Assuming data is an array of cars
+                // Master cars already registered for this country, plus the cars that actually exist
+                // in car_unlocked for it. Both feed the "Add New Car" dropdown.
+                const [masterResp, unlockedResp] = await Promise.all([
+                    axiosInstance.post(`${BASE_URL}/srl/master-cars/get-cars-unlocked`, {"countryCode": selectedCountry}),
+                    axiosInstance.post(`${BASE_URL}/shell-events/car-unlocked/get-cars-by-country`, {"country": selectedCountry}),
+                ]);
+                setCars(masterResp.data.data || []); // Assuming data is an array of cars
+                setUnlockedCars(unlockedResp.data?.data || []);
             } catch (error) {
                 console.error('Error fetching cars:', error);
             }
@@ -114,6 +123,15 @@ const Settings = () => {
     const closeModal = () => setIsModalOpen(false);
 
     const currentCountryName = countries.find(country =>country.country === selectedCountry)?.countryName || selectedCountry;
+
+    // Options for the Add New Car dropdown: distinct car names from the registered master cars and
+    // from car_unlocked for the selected country. CreatableSelect still lets the user type a new one.
+    const carNameOptions = useMemo(() => {
+        const names = new Set();
+        (cars || []).forEach((c) => { if (c?.carName) names.add(c.carName); });
+        (unlockedCars || []).forEach((c) => { if (c?.carName) names.add(c.carName); });
+        return Array.from(names).sort().map((n) => ({ value: n, label: n }));
+    }, [cars, unlockedCars]);
 
     return (
         <div style={{ padding: '24px' }}>
@@ -274,24 +292,20 @@ const Settings = () => {
                                 >
                                     Car Name
                                 </label>
-                                <input
-                                    id="carName"
-                                    onChange={(e) => {
-                                        setNewName(e.target.value);
+                                <CreatableSelect
+                                    inputId="carName"
+                                    isClearable
+                                    value={newName ? { value: newName, label: newName } : null}
+                                    onChange={(opt) => {
+                                        setNewName(opt ? opt.value : '');
                                         if (error) setError(null);
                                     }}
-                                    type="text"
-                                    value={newName}
-                                    style={{
-                                        width: '100%',
-                                        padding: '8px 10px',
-                                        fontSize: '14px',
-                                        borderRadius: '6px',
-                                        border: '1px solid #d1d5db',
-                                        boxSizing: 'border-box',
-                                    }}
-                                    placeholder="Enter car name"
-                                    aria-invalid={!!error}
+                                    options={carNameOptions}
+                                    placeholder="Select a car or type a new one"
+                                    classNamePrefix="react-select"
+                                    formatCreateLabel={(input) => `Add "${input}"`}
+                                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                    styles={{ menuPortal: (base) => ({ ...base, zIndex: 2000 }) }}
                                 />
                             </div>
                             <div

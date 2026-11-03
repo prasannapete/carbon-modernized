@@ -176,8 +176,8 @@ const RacePlayed = ({ startDate, endDate,country}) => {
                                         {summaryData.map((car, idx) => (
                                             <tr key={idx}>
                                                 <td>{car.carName}</td>
-                                                <td>{car.totalRacDurationInHours}</td>
-                                                <td>{car.cumulativeRacDurationInHours}</td>
+                                                <td>{formatDuration(car.totalRcDuration)}</td>
+                                                <td>{formatDuration(car.cumulativeRcDuration)}</td>
                                             </tr>
                                         ))}
                                         </tbody>
