@@ -42,6 +42,15 @@ spring:
     port: ${MAIL_PORT}
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
+    # Gmail (and most SMTP relays on port 587) require STARTTLS; without this the server
+    # rejects the send with "530 Must issue a STARTTLS command first".
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
   security:
     oauth2:
       resourceserver:

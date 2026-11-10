@@ -21,7 +21,8 @@ public class EventsDTO {
     private String primaryColor;
     private String eventType;
     private List<EventScoresDTO> eventScoresDTOList;
-    private int consoleId;
+    // Nullable to mirror Events.consoleId (console_id may be NULL); a primitive int would NPE on unbox.
+    private Integer consoleId;
     private Long createdBy;
     private Date creationTime;
     private Long lastModifiedBy;
@@ -34,7 +35,7 @@ public class EventsDTO {
     public EventsDTO() {
     }
 
-    public EventsDTO(Long id, String eventName, String description, Date startDate, Date endDate, int scoreType, int isLive, String logoPath, String primaryColor,String eventType,int consoleId, Long createdBy, Date creationTime, Long lastModifiedBy, Date lastModifiedTime, int isDeleted, Long deletedBy, Date deletedTime) {
+    public EventsDTO(Long id, String eventName, String description, Date startDate, Date endDate, int scoreType, int isLive, String logoPath, String primaryColor,String eventType,Integer consoleId, Long createdBy, Date creationTime, Long lastModifiedBy, Date lastModifiedTime, int isDeleted, Long deletedBy, Date deletedTime) {
         this.id = id;
         this.eventName = eventName;
         this.description = description;

@@ -46,6 +46,8 @@ public class Events extends ApplicationModel {
     @Column(name = "event_type")
     private String eventType;
 
+    // Nullable: existing carbon_events rows may have console_id = NULL. A primitive int cannot hold
+    // null and made reads fail with "Null value was assigned to a property ... consoleId".
     @Column(name = "console_id")
-    private int consoleId;
+    private Integer consoleId;
 }
