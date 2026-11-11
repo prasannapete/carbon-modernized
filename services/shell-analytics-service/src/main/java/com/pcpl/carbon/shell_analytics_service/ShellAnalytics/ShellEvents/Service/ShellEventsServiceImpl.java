@@ -47,6 +47,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
+import com.pcpl.carbon.pcplsdk.Common.User.Model.User;
+import com.pcpl.carbon.pcplsdk.ShellAnalytics.UserCountries.DTO.UserCountriesDTO;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.AppLaunched.Repository.AppLaunchedRepository;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.BrandViewedGarage.Repository.BrandViewedGarageRepository;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.CarUnlocked.Repository.CarUnlockedRepository;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.RCPlayed.Repository.RCPlayedRepository;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.RacePlayed.Repository.RacePlayedRepository;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.User.Service.UserInformationService;
+import com.pcpl.carbon.shell_analytics_service.ShellAnalytics.ShellEvents.UserCountries.Repository.UserCountriesRepository;
 
 import java.io.*;
 import java.lang.reflect.Field;
@@ -91,6 +100,22 @@ public class ShellEventsServiceImpl implements ShellEventsService{
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    // Repositories used by the single-request weekly dashboard (one bucketed query per metric).
+    @Autowired
+    private AppLaunchedRepository appLaunchedRepository;
+    @Autowired
+    private BrandViewedGarageRepository brandViewedGarageRepository;
+    @Autowired
+    private CarUnlockedRepository carUnlockedRepository;
+    @Autowired
+    private RCPlayedRepository rcPlayedRepository;
+    @Autowired
+    private RacePlayedRepository racePlayedRepository;
+    @Autowired
+    private UserInformationService userInformationService;
+    @Autowired
+    private UserCountriesRepository userCountriesRepository;
 
     @Autowired
    ObjectMapper objectMapper;
@@ -497,21 +522,16 @@ public class ShellEventsServiceImpl implements ShellEventsService{
                 countries.putIfAbsent(e.getKey(), storeCountryName(e.getValue(), e.getKey()));
             }
 
-            // For the Weekly report only: one data bundle per week in the range (each scoped to that
-            // week's dates, so the weekly columns are calculated exactly like the dashboard's range totals).
+            // For the Weekly report only: one data bundle per week in the range. These are built from
+            // SIX bucketed "GROUP BY week" queries over the whole range (one per metric) and pivoted
+            // into per-week bundles, instead of running a full 6-query gather per week. The per-week
+            // bundles hold the exact same fields/values the Excel reads (launches / views / totalUsers
+            // / unlocked / totalRcDuration), so the workbook's numbers and layout are unchanged — only
+            // a 1-year export goes from hundreds of queries to ~6.
             List<Week> weeks = weekly ? computeWeeks(startDate, endDate) : Collections.emptyList();
-            List<DataBundle> weeklyData = new ArrayList<>();
-            if (weekly) {
-                for (Week w : weeks) {
-                    Map<String, String> wf = new HashMap<>();
-                    wf.put("startDate", w.start());
-                    wf.put("endDate", w.end());
-                    wf.put("country", formData.get("country"));
-                    // Per-week bundles never render Store Performance, so skip the App/Play Store
-                    // queries here (2 fewer, heavier queries per week).
-                    weeklyData.add(gather(wf, false));
-                }
-            }
+            List<DataBundle> weeklyData = weekly
+                    ? weeklyBundlesFromBuckets(weeks, startDate, endDate, formData.get("country"))
+                    : new ArrayList<>();
 
             Map<String, XSSFCellStyle> styles = buildStyles(workbook);
             String period = formatPeriod(startDate) + " TILL " + formatPeriod(endDate);
@@ -561,6 +581,323 @@ public class ShellEventsServiceImpl implements ShellEventsService{
             throw new Exception("Failed to generate Excel: " + e.getMessage(), e);
         }
         return ApplicationResponse.builder().build();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Weekly dashboard JSON – one request returning every week's numbers for all six sections.
+    //  Per-week values come from ONE "GROUP BY date_trunc('week', ...)" query per metric over the
+    //  whole range (so a 2-week range and a 1-year range both cost ~6 bucketed queries + the
+    //  full-range gather, instead of one 6-query gather per week). Each bucketed query mirrors the
+    //  filters/definition of that metric's existing per-range query, so the numbers are identical to
+    //  the per-week approach and to the Weekly Excel export. Cumulative columns, the country/car
+    //  master list and display names still come from the full-range gather.
+    // ---------------------------------------------------------------------------------------------
+
+    @Override
+    public ApplicationResponse getWeeklyDashboard(String startDate, String endDate, String country) {
+        ApplicationResponse resp = ApplicationResponse.builder().build();
+        try {
+            Map<String, String> formData = new HashMap<>();
+            formData.put("startDate", startDate);
+            formData.put("endDate", endDate);
+            formData.put("country", (country != null && !country.trim().isEmpty()) ? country.trim() : "");
+
+            // Full-range bundle: supplies the all-time Cumulative column and the master country/car
+            // ordering. The Weekly View has no Store Performance section, so skip the two heavy
+            // App Store / Play Store queries here (includeStores=false) – they are never read below
+            // and are the slowest part of a gather.
+            DataBundle full = gather(formData, false);
+
+            // Week buckets (labels/columns) for the selected range, computed exactly like the Excel.
+            List<Week> weeks = computeWeeks(startDate, endDate);
+            int nw = weeks.size();
+
+            List<Map<String, Object>> weekMeta = new ArrayList<>();
+            for (Week w : weeks) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("start", w.start());
+                m.put("end", w.end());
+                m.put("label", w.label());
+                weekMeta.add(m);
+            }
+
+            // Each computed week maps to the Monday of its ISO week; every bucketed SQL row carries the
+            // same Monday (date_trunc('week', ...)), so this lines rows up to the right week column.
+            Map<java.time.LocalDate, Integer> weekIndex = new HashMap<>();
+            for (int i = 0; i < nw; i++) {
+                java.time.LocalDate monday = java.time.LocalDate.parse(weeks.get(i).start())
+                        .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+                weekIndex.put(monday, i);
+            }
+
+            // Country list exactly as each per-metric service resolves it (empty filter -> the user's
+            // own countries), so data scope/tenant visibility is identical to the per-range path.
+            List<String> countryList = resolveCountryList(formData.get("country"));
+
+            // Per-week values: ONE bucketed query per metric over the WHOLE range (not one gather per
+            // week). This is what lets a full year load in ~6 queries instead of hundreds.
+            Map<String, double[]> usersWk = new HashMap<>(), appWk = new HashMap<>(), brandWk = new HashMap<>();
+            Map<String, double[]> carsWk = new HashMap<>(), rcWk = new HashMap<>(), raceWk = new HashMap<>();
+            if (!countryList.isEmpty() && nw > 0) {
+                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd");
+                Date rangeStart = fmt.parse(startDate.trim());
+                // Include the whole end day, exactly like the per-range services do.
+                Date rangeEnd = new Date(fmt.parse(endDate.trim()).getTime() + 86399999L);
+                fillFlat(usersWk, carUnlockedRepository.getWeeklyDistinctUsers(rangeStart, rangeEnd, countryList), weekIndex, nw);
+                fillFlat(appWk, appLaunchedRepository.getWeeklyLaunches(rangeStart, rangeEnd, countryList), weekIndex, nw);
+                fillFlat(brandWk, brandViewedGarageRepository.getWeeklyViews(rangeStart, rangeEnd, countryList), weekIndex, nw);
+                fillCar(carsWk, carUnlockedRepository.getWeeklyCarUnlocked(rangeStart, rangeEnd, countryList), weekIndex, nw);
+                fillCar(rcWk, rcPlayedRepository.getWeeklyRcDuration(rangeStart, rangeEnd, countryList), weekIndex, nw);
+                fillCar(raceWk, racePlayedRepository.getWeeklyRaceDuration(rangeStart, rangeEnd, countryList), weekIndex, nw);
+            }
+
+            Map<String, Object> sections = new LinkedHashMap<>();
+            sections.put("users", flatWeekly(full.averages, "countryCode", "countryName", "cummulativeUsers", usersWk, nw));
+            sections.put("appLaunches", flatWeekly(full.appLaunch, "country", "countryName", "cumulative", appWk, nw));
+            sections.put("brandViews", flatWeekly(full.brand, "country", "countryName", "cumulative", brandWk, nw));
+            sections.put("carsUnlocked", carWeekly(full.cars, "cumulative", carsWk, nw));
+            sections.put("rcPlayed", carWeekly(full.rc, "cumulativeRcDuration", rcWk, nw));
+            sections.put("racePlayed", carWeekly(full.race, "cumulativeRcDuration", raceWk, nw));
+
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("weeks", weekMeta);
+            payload.put("sections", sections);
+
+            resp.setData(payload);
+            resp.setSuccess(true);
+            resp.setMessage("Weekly dashboard data fetched successfully!");
+        } catch (Exception e) {
+            log.error("Weekly dashboard failed for {}..{}: {}", startDate, endDate, e.getMessage(), e);
+            resp.setSuccess(false);
+            resp.setError(e.getMessage());
+        }
+        return resp;
+    }
+
+    /** Country list exactly as the per-metric services resolve it: explicit filter, else the user's countries. */
+    private List<String> resolveCountryList(String countries) {
+        List<String> list = new ArrayList<>();
+        if (countries != null && !countries.trim().isEmpty()) {
+            for (String s : countries.split(",")) {
+                String t = s.trim();
+                if (!t.isEmpty()) list.add(t);
+            }
+        }
+        if (list.isEmpty()) {
+            User user = userInformationService.getUser();
+            for (UserCountriesDTO uc : userCountriesRepository.getUserCountriesByUserId(user.getId())) {
+                if (uc.getCountryCode() != null) list.add(uc.getCountryCode());
+            }
+        }
+        return list;
+    }
+
+    /** Buckets flat rows [country, week_start(date), value] into country -> double[week]. */
+    private void fillFlat(Map<String, double[]> out, List<Object[]> rows, Map<java.time.LocalDate, Integer> weekIndex, int nw) {
+        if (rows == null) return;
+        for (Object[] r : rows) {
+            String country = r[0] == null ? null : r[0].toString();
+            java.time.LocalDate monday = toLocalDate(r[1]);
+            Integer i = (country == null || monday == null) ? null : weekIndex.get(monday);
+            if (i == null) continue;
+            double v = (r[2] instanceof Number) ? ((Number) r[2]).doubleValue() : 0;
+            out.computeIfAbsent(country, k -> new double[nw])[i] += v;
+        }
+    }
+
+    /** Buckets per-car rows [country, carName, week_start(date), value] into (country\u0000carName) -> double[week]. */
+    private void fillCar(Map<String, double[]> out, List<Object[]> rows, Map<java.time.LocalDate, Integer> weekIndex, int nw) {
+        if (rows == null) return;
+        for (Object[] r : rows) {
+            String country = r[0] == null ? null : r[0].toString();
+            String car = r[1] == null ? null : r[1].toString();
+            java.time.LocalDate monday = toLocalDate(r[2]);
+            Integer i = (country == null || car == null || monday == null) ? null : weekIndex.get(monday);
+            if (i == null) continue;
+            double v = (r[3] instanceof Number) ? ((Number) r[3]).doubleValue() : 0;
+            out.computeIfAbsent(country + "\u0000" + car, k -> new double[nw])[i] += v;
+        }
+    }
+
+    /** Converts a SQL/Java date value (from date_trunc('week',...)::date) to a LocalDate. */
+    private java.time.LocalDate toLocalDate(Object o) {
+        if (o == null) return null;
+        if (o instanceof java.sql.Date) return ((java.sql.Date) o).toLocalDate();
+        if (o instanceof java.time.LocalDate) return (java.time.LocalDate) o;
+        if (o instanceof java.util.Date) return ((java.util.Date) o).toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+        String s = o.toString();
+        return s.length() >= 10 ? java.time.LocalDate.parse(s.substring(0, 10)) : null;
+    }
+
+    /**
+     * Flat per-country section (Users / App Launches / Brand Views): one row per country with a value
+     * per week (from the bucketed map {@code weekVals}, keyed by country code) plus the all-time
+     * Cumulative. Countries, display names and the Cumulative come from {@code fullList} (the
+     * full-range gather), so the set/order matches the Excel exactly.
+     */
+    private List<Map<String, Object>> flatWeekly(List<Map<String, Object>> fullList,
+                                                 String codeField, String nameField, String cumulField,
+                                                 Map<String, double[]> weekVals, int nw) {
+        LinkedHashMap<String, Map<String, Object>> out = new LinkedHashMap<>();
+        for (Map<String, Object> r : fullList) {
+            String code = str(r.get(codeField));
+            if (code == null || code.isEmpty() || out.containsKey(code)) continue;
+            String name = str(r.get(nameField));
+            double[] wv = weekVals.getOrDefault(code, new double[nw]);
+            List<Double> wl = new ArrayList<>(nw);
+            for (double v : wv) wl.add(v);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("code", code);
+            row.put("name", (name != null && !name.isEmpty()) ? name : code);
+            row.put("weekVals", wl);
+            row.put("cumulative", toDouble(r.get(cumulField)));
+            out.put(code, row);
+        }
+        return new ArrayList<>(out.values());
+    }
+
+    /**
+     * Nested per-country / per-car section (Cars Unlocked / RC Played / Race Played): one block per
+     * country, each car with a value per week (from the bucketed map {@code weekVals}, keyed by
+     * country\u0000carName) + all-time Cumulative. Country/car order and the Cumulative come from
+     * {@code fullList} via the Excel's {@link #carOrder}/{@link #carField} helpers.
+     */
+    private List<Map<String, Object>> carWeekly(List<Map<String, Object>> fullList,
+                                                String cumulField, Map<String, double[]> weekVals, int nw) {
+        LinkedHashMap<String, String> countries = new LinkedHashMap<>(); // code -> display name
+        for (Map<String, Object> r : fullList) {
+            String code = str(r.get("country"));
+            if (code == null || code.isEmpty()) continue;
+            String name = str(r.get("countryName"));
+            countries.putIfAbsent(code, (name != null && !name.isEmpty()) ? name : code);
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<String, String> c : countries.entrySet()) {
+            String code = c.getKey(), name = c.getValue();
+            List<Map<String, Object>> cars = new ArrayList<>();
+            for (String carName : carOrder(fullList, code, name)) {
+                double[] wv = weekVals.getOrDefault(code + "\u0000" + carName, new double[nw]);
+                List<Double> wl = new ArrayList<>(nw);
+                for (double v : wv) wl.add(v);
+                Map<String, Object> car = new LinkedHashMap<>();
+                car.put("carName", carName);
+                car.put("weekVals", wl);
+                car.put("cumulative", carField(fullList, code, name, carName, cumulField));
+                cars.add(car);
+            }
+            Map<String, Object> cty = new LinkedHashMap<>();
+            cty.put("code", code);
+            cty.put("name", name);
+            cty.put("cars", cars);
+            result.add(cty);
+        }
+        return result;
+    }
+
+    /**
+     * Builds one {@link DataBundle} per week for the Weekly Excel export from the SIX bucketed
+     * "GROUP BY week" queries (one per metric) over the whole range, pivoted by week. Each bundle is
+     * populated with exactly the fields the Excel reads from a gather result — appLaunch[].launches,
+     * brand[].views, averages[].totalUsers, cars[].unlocked, rc[]/race[].totalRcDuration, each tagged
+     * with the country code (and car name) so findRow/filterByCountry/carField match as before. This
+     * produces the identical numbers the per-week gather did, so the workbook's values and layout are
+     * unchanged; it just replaces hundreds of queries (for long ranges) with six.
+     */
+    private List<DataBundle> weeklyBundlesFromBuckets(List<Week> weeks, String startDate, String endDate, String country) throws Exception {
+        int nw = weeks.size();
+        List<DataBundle> bundles = new ArrayList<>(nw);
+        for (int i = 0; i < nw; i++) {
+            DataBundle b = new DataBundle();
+            b.appLaunch = new ArrayList<>();
+            b.brand = new ArrayList<>();
+            b.averages = new ArrayList<>();
+            b.cars = new ArrayList<>();
+            b.rc = new ArrayList<>();
+            b.race = new ArrayList<>();
+            b.appStore = Collections.emptyMap();
+            b.playStore = Collections.emptyMap();
+            bundles.add(b);
+        }
+        if (nw == 0) return bundles;
+
+        Map<java.time.LocalDate, Integer> weekIndex = new HashMap<>();
+        for (int i = 0; i < nw; i++) {
+            java.time.LocalDate monday = java.time.LocalDate.parse(weeks.get(i).start())
+                    .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+            weekIndex.put(monday, i);
+        }
+
+        List<String> countryList = resolveCountryList(country);
+        if (countryList.isEmpty()) return bundles;
+
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd");
+        Date rangeStart = fmt.parse(startDate.trim());
+        Date rangeEnd = new Date(fmt.parse(endDate.trim()).getTime() + 86399999L);
+
+        // Flat metrics: [country, week_start, value] -> one row {country, <field>} in that week's bundle.
+        for (Object[] r : appLaunchedRepository.getWeeklyLaunches(rangeStart, rangeEnd, countryList)) {
+            Integer i = weekIdx(weekIndex, r[1]);
+            if (i == null || r[0] == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("country", r[0].toString());
+            row.put("launches", num(r[2]));
+            bundles.get(i).appLaunch.add(row);
+        }
+        for (Object[] r : brandViewedGarageRepository.getWeeklyViews(rangeStart, rangeEnd, countryList)) {
+            Integer i = weekIdx(weekIndex, r[1]);
+            if (i == null || r[0] == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("country", r[0].toString());
+            row.put("views", num(r[2]));
+            bundles.get(i).brand.add(row);
+        }
+        for (Object[] r : carUnlockedRepository.getWeeklyDistinctUsers(rangeStart, rangeEnd, countryList)) {
+            Integer i = weekIdx(weekIndex, r[1]);
+            if (i == null || r[0] == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("countryCode", r[0].toString());
+            row.put("country", r[0].toString());
+            row.put("totalUsers", num(r[2]));
+            bundles.get(i).averages.add(row);
+        }
+        // Per-car metrics: [country, carName, week_start, value] -> {country, carName, <field>}.
+        for (Object[] r : carUnlockedRepository.getWeeklyCarUnlocked(rangeStart, rangeEnd, countryList)) {
+            Integer i = weekIdx(weekIndex, r[2]);
+            if (i == null || r[0] == null || r[1] == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("country", r[0].toString());
+            row.put("carName", r[1].toString());
+            row.put("unlocked", num(r[3]));
+            bundles.get(i).cars.add(row);
+        }
+        for (Object[] r : rcPlayedRepository.getWeeklyRcDuration(rangeStart, rangeEnd, countryList)) {
+            Integer i = weekIdx(weekIndex, r[2]);
+            if (i == null || r[0] == null || r[1] == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("country", r[0].toString());
+            row.put("carName", r[1].toString());
+            row.put("totalRcDuration", num(r[3]));
+            bundles.get(i).rc.add(row);
+        }
+        for (Object[] r : racePlayedRepository.getWeeklyRaceDuration(rangeStart, rangeEnd, countryList)) {
+            Integer i = weekIdx(weekIndex, r[2]);
+            if (i == null || r[0] == null || r[1] == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("country", r[0].toString());
+            row.put("carName", r[1].toString());
+            row.put("totalRcDuration", num(r[3]));
+            bundles.get(i).race.add(row);
+        }
+        return bundles;
+    }
+
+    private Integer weekIdx(Map<java.time.LocalDate, Integer> weekIndex, Object weekStart) {
+        java.time.LocalDate d = toLocalDate(weekStart);
+        return d == null ? null : weekIndex.get(d);
+    }
+
+    private double num(Object o) {
+        return (o instanceof Number) ? ((Number) o).doubleValue() : 0.0;
     }
 
     // ---------------------------------------------------------------------------------------------

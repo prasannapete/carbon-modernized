@@ -118,4 +118,29 @@ GROUP BY brandViewedGarage.country, country.country_name
         GROUP BY bvg.country
     """)
     List<Object[]> getCumulativeCountsBeforeDate(@Param("beforeDate") Date beforeDate);
+
+    // Weekly dashboard: per-country brand views bucketed by ISO week (Monday) across the whole range
+    // in ONE query. Same filters/definition as getCountryWiseViewsSummary's "views"; only the
+    // date_trunc('week', ...) grouping is added. Returns rows of [country, week_start(date), views].
+    @Query(value = """
+        SELECT bvg.country,
+               date_trunc('week', bvg.creation_time)::date AS week_start,
+               SUM(CASE WHEN CAST(bvg.creation_time as date) >= (
+                           SELECT CAST(MIN(cu.creation_time) as date)
+                           FROM srl_car_unlocked cu
+                           WHERE cu.car_name IN (SELECT mc2.car_name FROM srl_master_cars mc2
+                                                 WHERE mc2.country_code IN (:countries) AND mc2.is_active = 1 AND mc2.is_deleted = 0)
+                             AND cu.game_id = bvg.game_id AND cu.is_deleted = 0 AND cu.country IN (:countries))
+                        THEN 1 ELSE 0 END) AS views
+        FROM srl_brand_viewed_garage bvg
+        WHERE bvg.is_deleted = 0
+          AND bvg.game_id IN (SELECT DISTINCT cu.game_id FROM srl_car_unlocked cu
+                              WHERE cu.car_name IN (SELECT mc2.car_name FROM srl_master_cars mc2
+                                                    WHERE mc2.country_code IN (:countries) AND mc2.is_active = 1 AND mc2.is_deleted = 0)
+                                AND cu.is_deleted = 0 AND cu.country IN (:countries))
+          AND bvg.country IN (:countries)
+          AND CAST(bvg.creation_time as date) >= :startDate AND CAST(bvg.creation_time as date) <= :endDate
+        GROUP BY bvg.country, date_trunc('week', bvg.creation_time)
+    """, nativeQuery = true)
+    List<Object[]> getWeeklyViews(@Param("startDate") Date startDate, @Param("endDate") Date endDate, @Param("countries") List<String> countries);
 }

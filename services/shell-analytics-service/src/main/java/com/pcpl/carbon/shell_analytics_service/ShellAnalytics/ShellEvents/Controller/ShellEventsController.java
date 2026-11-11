@@ -183,6 +183,23 @@ public class ShellEventsController {
     }
 
 
+    // Single-request weekly dashboard data (replaces the Weekly View's ~48 parallel per-week calls).
+    // Returns { weeks:[{start,end,label}], sections:{ users, appLaunches, brandViews, carsUnlocked,
+    // rcPlayed, racePlayed } } computed server-side with the same logic as the Weekly Excel export.
+    @RequestMapping(value = "/weekly-dashboard", method = RequestMethod.POST)
+    public ApplicationResponse weeklyDashboard(@RequestBody Map<String, String> request) {
+        ApplicationResponse applicationResponse = ApplicationResponse.builder().build();
+        try {
+            applicationResponse = shellEventsService.getWeeklyDashboard(
+                    request.get("startDate"), request.get("endDate"), request.get("country"));
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            applicationResponse.setSuccess(false);
+            applicationResponse.setError(e.getMessage());
+        }
+        return applicationResponse;
+    }
+
     @RequestMapping(value = "/export-multi-tab-excel", method = RequestMethod.POST)
     public void exportMultiTabExcel(HttpServletResponse response,
                                     @RequestBody Map<String, String> request) throws Exception {

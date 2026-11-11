@@ -7,13 +7,17 @@ import '../../css/WeeklyView.css';
 
 // Weekly dashboard view: shows the same metrics as the standard dashboard, but with one column per
 // week (instead of the single "Selected Period" column) plus a "Cumulative" column, and graphs that
-// group their series by week. The week buckets follow the exact same logic as the Weekly Report Excel
-// download, and the tables mirror that Excel's layout. This view is self-contained so the standard
-// dashboard is left exactly as-is (it does not reuse the shared .summary-table styling).
+// group their series by week.
+//
+// All of the week bucketing and the per-week numbers are now computed ON THE SERVER by a single
+// endpoint (/shell-events/weekly-dashboard), which reuses the exact same computeWeeks + gather logic
+// as the Weekly Report Excel download. So this view makes ONE request and the numbers are guaranteed
+// to match the Excel. Previously this component fired ~48 parallel per-week requests (6 sections x
+// ~8 weeks); on production that exhausted the backend's connection pool, and the dropped requests
+// were silently turned into 0 — which is what made some week columns show 0 / "No data available".
 
-// The axios instance has no baseURL, so every request MUST be prefixed with the shell-analytics
-// service base URL exactly like the standard dashboard components do. Without this prefix the POSTs
-// hit the frontend origin and fail, which left Cars Unlocked / RC Played (and the others) blank.
+// The axios instance has no baseURL, so the request MUST be prefixed with the shell-analytics service
+// base URL exactly like the standard dashboard components do.
 const BASE_URL = process.env.REACT_APP_SHELL_ANALYTICS_SERVICE_BASE_URL;
 
 const COLORS = [
@@ -36,60 +40,14 @@ const formatDuration = (minutes) => {
     return `0 h ${mins} min`;
 };
 
-// Split [start, end] into weeks: first week = start -> that week's Sunday, each later week Mon-Sun,
-// final week capped at end. Dates are "yyyy-MM-dd" strings (what the endpoints expect). Labels like
-// "21 Sep - 27 Sep" match the Excel week headings exactly.
-export const computeWeeks = (startStr, endStr) => {
-    const weeks = [];
-    if (!startStr || !endStr) return weeks;
+// Guard only: when the range is empty/invalid we show a hint instead of calling the server. The real
+// week buckets come from the server response (weeks[]), so this never needs to match it exactly.
+const hasRange = (startStr, endStr) => {
+    if (!startStr || !endStr) return false;
     const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-    const fmt = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-    const lbl = (dt) => dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     const start = parse(startStr), end = parse(endStr);
-    if (isNaN(start) || isNaN(end) || start > end) return weeks;
-    let ws = new Date(start);
-    while (ws <= end) {
-        const isoDow = ws.getDay() === 0 ? 7 : ws.getDay(); // Mon=1 .. Sun=7
-        const sunday = new Date(ws);
-        sunday.setDate(ws.getDate() + (7 - isoDow));
-        const weekEnd = sunday > end ? new Date(end) : sunday;
-        weeks.push({ start: fmt(ws), end: fmt(weekEnd), label: `${lbl(ws)} - ${lbl(weekEnd)}` });
-        ws = new Date(weekEnd);
-        ws.setDate(weekEnd.getDate() + 1);
-    }
-    return weeks;
+    return !isNaN(start) && !isNaN(end) && start <= end;
 };
-
-// Fetch one endpoint once per week (in parallel). Returns an array aligned with `weeks` (each entry
-// is the response body, or null on failure), plus a loading flag.
-function useWeeklyResponses(endpoint, weeks, country, startLoading, stopLoading) {
-    const [responses, setResponses] = useState(null);
-    const weeksKey = weeks.map((w) => `${w.start}:${w.end}`).join(',');
-    useEffect(() => {
-        if (!weeks.length) { setResponses([]); return; }
-        let cancelled = false;
-        (async () => {
-            if (startLoading) startLoading();
-            try {
-                const results = await Promise.all(weeks.map((w) =>
-                    axiosInstance
-                        .post(`${BASE_URL}${endpoint}`, { startDate: w.start, endDate: w.end, country }, {
-                            headers: { 'Content-Type': 'application/json' },
-                            withCredentials: true,
-                        })
-                        .then((r) => r.data)
-                        .catch(() => null)
-                ));
-                if (!cancelled) setResponses(results);
-            } finally {
-                if (stopLoading) stopLoading();
-            }
-        })();
-        return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [endpoint, weeksKey, country]);
-    return responses;
-}
 
 // Table: COUNTRY/CARS | week... | Cumulative, laid out like the Excel (blue header, name column
 // left-aligned, numbers right-aligned, grand-total row) and horizontally scrollable when wide.
@@ -130,30 +88,23 @@ function WeeklyTable({ nameHeader, rows, weeks, colTotals, cumTotal, fmt }) {
 }
 
 // Flat per-country section (Users / App Launches / Brand Views): one row per country across weeks,
-// with a weekly line graph (one line per country).
-function FlatWeeklySection({ title, endpoint, weeks, country, rowsFromResp, keyField, nameField, periodKey, cumulKey, startLoading, stopLoading }) {
-    const responses = useWeeklyResponses(endpoint, weeks, country, startLoading, stopLoading);
-    if (responses === null) return (<div className="weekly-section"><h2>{title}</h2><div className="weekly-empty">Loading...</div></div>);
+// with a weekly line graph (one line per country). `rows` come straight from the server payload:
+// [{ code, name, weekVals:[...], cumulative }].
+function FlatWeeklySection({ title, weeks, rows: serverRows }) {
+    const rows = (serverRows || [])
+        .map((r) => ({
+            key: r.code,
+            label: `${r.name} (${r.code})`,
+            weekVals: (r.weekVals || []).map((v) => Number(v) || 0),
+            cumulative: Number(r.cumulative) || 0,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
 
-    const map = {};
-    weeks.forEach((w, i) => {
-        const rows = rowsFromResp(responses[i]) || [];
-        rows.forEach((r) => {
-            const code = r[keyField];
-            if (code == null) return;
-            if (!map[code]) map[code] = { key: code, label: `${r[nameField]} (${code})`, weekVals: Array(weeks.length).fill(0), cumulative: 0 };
-            map[code].weekVals[i] = Number(r[periodKey]) || 0;
-            const c = Number(r[cumulKey]);
-            if (!isNaN(c) && c) map[code].cumulative = c; // cumulative is all-time, identical across weeks
-            map[code].label = `${r[nameField]} (${code})`;
-        });
-    });
-    const rows = Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
-    const colTotals = weeks.map((_, i) => rows.reduce((s, r) => s + r.weekVals[i], 0));
+    const colTotals = weeks.map((_, i) => rows.reduce((s, r) => s + (r.weekVals[i] || 0), 0));
     const cumTotal = rows.reduce((s, r) => s + r.cumulative, 0);
     const chartData = weeks.map((w, i) => {
         const o = { week: w.label };
-        rows.forEach((r) => { o[r.label] = r.weekVals[i]; });
+        rows.forEach((r) => { o[r.label] = r.weekVals[i] || 0; });
         return o;
     });
 
@@ -185,53 +136,36 @@ function FlatWeeklySection({ title, endpoint, weeks, country, rowsFromResp, keyF
     );
 }
 
-// Nested per-country / per-car section (Cars Unlocked / RC Played / Race Played):
-// one block per country with CARS | week... | Cumulative and a weekly grouped bar chart.
-function CarWeeklySection({ title, endpoint, weeks, country, periodKey, cumulKey, isDuration, startLoading, stopLoading }) {
-    const responses = useWeeklyResponses(endpoint, weeks, country, startLoading, stopLoading);
-    if (responses === null) return (<div className="weekly-section"><h2>{title}</h2><div className="weekly-empty">Loading...</div></div>);
-
-    const countryName = {};
-    const data = {}; // code -> carName -> { weekVals, cumulative }
-    weeks.forEach((w, i) => {
-        const d = responses[i] && responses[i].data;
-        if (!d) return;
-        const gd = d.graphData || {};
-        Object.keys(gd).forEach((code) => { const arr = gd[code] || []; if (arr[0] && arr[0].countryName) countryName[code] = arr[0].countryName; });
-        const summary = Array.isArray(d.summary) ? d.summary : [];
-        summary.forEach((r) => {
-            const code = r.country; const car = r.carName;
-            if (code == null || car == null) return;
-            if (!data[code]) data[code] = {};
-            if (!data[code][car]) data[code][car] = { weekVals: Array(weeks.length).fill(0), cumulative: 0 };
-            data[code][car].weekVals[i] = Number(r[periodKey]) || 0;
-            const c = Number(r[cumulKey]);
-            if (!isNaN(c) && c) data[code][car].cumulative = c;
-        });
-    });
-
-    const codes = Object.keys(data);
+// Nested per-country / per-car section (Cars Unlocked / RC Played / Race Played): one block per
+// country with CARS | week... | Cumulative and a weekly grouped bar chart. `countries` come straight
+// from the server payload: [{ code, name, cars:[{ carName, weekVals:[...], cumulative }] }].
+function CarWeeklySection({ title, weeks, countries, isDuration }) {
     const fmt = isDuration ? formatDuration : fmtInt;
     const side = weeks.length <= SIDE_BY_SIDE_MAX_WEEKS;
-    if (!codes.length) return (<div className="weekly-section"><h2>{title}</h2><div className="weekly-empty">No data available for the selected filters.</div></div>);
+    const list = countries || [];
+    if (!list.length) return (<div className="weekly-section"><h2>{title}</h2><div className="weekly-empty">No data available for the selected filters.</div></div>);
 
     return (
         <div className="weekly-section">
             <h2>{title}</h2>
-            {codes.map((code, ci) => {
-                const cars = Object.keys(data[code]);
-                const name = countryName[code] || code;
-                const rows = cars.map((car) => ({ key: car, label: car, weekVals: data[code][car].weekVals, cumulative: data[code][car].cumulative }));
-                const colTotals = weeks.map((_, i) => cars.reduce((s, car) => s + data[code][car].weekVals[i], 0));
-                const cumTotal = cars.reduce((s, car) => s + data[code][car].cumulative, 0);
-                const chartData = cars.map((car) => {
-                    const o = { car };
-                    weeks.forEach((w, i) => { o[w.label] = Math.round(data[code][car].weekVals[i]); });
+            {list.map((cty, ci) => {
+                const name = cty.name || cty.code;
+                const rows = (cty.cars || []).map((car) => ({
+                    key: car.carName,
+                    label: car.carName,
+                    weekVals: (car.weekVals || []).map((v) => Number(v) || 0),
+                    cumulative: Number(car.cumulative) || 0,
+                }));
+                const colTotals = weeks.map((_, i) => rows.reduce((s, r) => s + (r.weekVals[i] || 0), 0));
+                const cumTotal = rows.reduce((s, r) => s + r.cumulative, 0);
+                const chartData = rows.map((r) => {
+                    const o = { car: r.label };
+                    weeks.forEach((w, i) => { o[w.label] = Math.round(r.weekVals[i] || 0); });
                     return o;
                 });
                 return (
-                    <div key={code} className="weekly-country">
-                        <div className="weekly-country-title">Country #{ci + 1} - {name} ({code})</div>
+                    <div key={cty.code} className="weekly-country">
+                        <div className="weekly-country-title">Country #{ci + 1} - {name} ({cty.code})</div>
                         <div className={`weekly-layout${side ? ' side' : ''}`}>
                             <WeeklyTable nameHeader="CARS" rows={rows} weeks={weeks} colTotals={colTotals} cumTotal={cumTotal} fmt={fmt} />
                             <div className="weekly-chart">
@@ -255,52 +189,58 @@ function CarWeeklySection({ title, endpoint, weeks, country, periodKey, cumulKey
 }
 
 const WeeklyView = ({ startDate, endDate, country, startLoading, stopLoading }) => {
-    const weeks = computeWeeks(startDate, endDate);
-    if (!weeks.length) {
+    // null = still loading; a payload object once loaded; the error string on failure.
+    const [payload, setPayload] = useState(null);
+    const [error, setError] = useState(null);
+
+    const rangeOk = hasRange(startDate, endDate);
+
+    useEffect(() => {
+        if (!rangeOk) { setPayload(null); setError(null); return; }
+        let cancelled = false;
+        setPayload(null);
+        setError(null);
+        if (startLoading) startLoading();
+        axiosInstance
+            .post(`${BASE_URL}/shell-events/weekly-dashboard`, { startDate, endDate, country }, {
+                headers: { 'Content-Type': 'application/json' },
+                withCredentials: true,
+            })
+            .then((r) => {
+                if (cancelled) return;
+                const data = r.data && r.data.data ? r.data.data : null;
+                if (!data) { setError('No data returned for the selected range.'); return; }
+                setPayload(data);
+            })
+            .catch((e) => {
+                // No silent zeros: a failed request surfaces an error instead of rendering as 0.
+                if (!cancelled) setError(e?.message || 'Failed to load weekly data.');
+            })
+            .finally(() => { if (stopLoading) stopLoading(); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [startDate, endDate, country]);
+
+    if (!rangeOk) {
         return <div className="dashboard-content"><div className="weekly-section"><div className="weekly-empty">Select a date range to see the weekly breakdown.</div></div></div>;
     }
-    const common = { weeks, country, startLoading, stopLoading };
+    if (error) {
+        return <div className="dashboard-content"><div className="weekly-section"><div className="weekly-empty">Could not load the weekly data: {error}. Please retry.</div></div></div>;
+    }
+    if (payload === null) {
+        return <div className="dashboard-content"><div className="weekly-section"><div className="weekly-empty">Loading...</div></div></div>;
+    }
+
+    const weeks = payload.weeks || [];
+    const sections = payload.sections || {};
     return (
         <>
-            <FlatWeeklySection
-                title="Users"
-                endpoint="/shell-events/car-unlocked/get-cars-average"
-                rowsFromResp={(d) => (d ? d.data : []) || []}
-                keyField="countryCode" nameField="countryName" periodKey="totalUsers" cumulKey="cummulativeUsers"
-                {...common}
-            />
-            <FlatWeeklySection
-                title="App Launches"
-                endpoint="/shell-events/app-launched/get-country-wise-data"
-                rowsFromResp={(d) => (d && d.data ? d.data.summaryTable : []) || []}
-                keyField="country" nameField="countryName" periodKey="launches" cumulKey="cumulative"
-                {...common}
-            />
-            <FlatWeeklySection
-                title="Brand Views"
-                endpoint="/shell-events/brand-viewed-garage/get-country-wise-data"
-                rowsFromResp={(d) => (d && d.data ? d.data.summaryTable : []) || []}
-                keyField="country" nameField="countryName" periodKey="views" cumulKey="cumulative"
-                {...common}
-            />
-            <CarWeeklySection
-                title="Cars Unlocked"
-                endpoint="/shell-events/car-unlocked/get-car-unlocked-data"
-                periodKey="unlocked" cumulKey="cumulative" isDuration={false}
-                {...common}
-            />
-            <CarWeeklySection
-                title="Remote Control Played"
-                endpoint="/shell-events/rc-played/get-country-wise-data"
-                periodKey="totalRcDuration" cumulKey="cumulativeRcDuration" isDuration={true}
-                {...common}
-            />
-            <CarWeeklySection
-                title="Race Played"
-                endpoint="/shell-events/race-played/get-country-wise-data"
-                periodKey="totalRcDuration" cumulKey="cumulativeRcDuration" isDuration={true}
-                {...common}
-            />
+            <FlatWeeklySection title="Users" weeks={weeks} rows={sections.users} />
+            <FlatWeeklySection title="App Launches" weeks={weeks} rows={sections.appLaunches} />
+            <FlatWeeklySection title="Brand Views" weeks={weeks} rows={sections.brandViews} />
+            <CarWeeklySection title="Cars Unlocked" weeks={weeks} countries={sections.carsUnlocked} isDuration={false} />
+            <CarWeeklySection title="Remote Control Played" weeks={weeks} countries={sections.rcPlayed} isDuration={true} />
+            <CarWeeklySection title="Race Played" weeks={weeks} countries={sections.racePlayed} isDuration={true} />
         </>
     );
 };

@@ -229,4 +229,39 @@ public interface CarUnlockedRepository extends PCPLCRUDRepository<CarUnlocked> {
         GROUP BY cu.country, cu.carName
     """)
     List<Object[]> getCumulativeCountsBeforeDate(@Param("beforeDate") Date beforeDate);
+
+    // Weekly dashboard – Users: distinct players (game_id) per country bucketed by ISO week (Monday)
+    // across the whole range in ONE query. Mirrors the "unique_users" sub-select of
+    // getCountryWiseUserAndEventCounts (active master cars, no is_deleted filter — intentionally, to
+    // match it). Returns rows of [country, week_start(date), total_users].
+    @Query(value = """
+        SELECT cu.country,
+               date_trunc('week', cu.creation_time)::date AS week_start,
+               COUNT(DISTINCT cu.game_id) AS total_users
+        FROM srl_car_unlocked cu
+        WHERE cu.country IN (:countries)
+          AND CAST(cu.creation_time as date) >= :startDate AND CAST(cu.creation_time as date) <= :endDate
+          AND cu.car_name IN (SELECT car_name FROM srl_master_cars WHERE country_code IN (:countries) AND is_active = 1)
+        GROUP BY cu.country, date_trunc('week', cu.creation_time)
+    """, nativeQuery = true)
+    List<Object[]> getWeeklyDistinctUsers(@Param("startDate") Date startDate, @Param("endDate") Date endDate, @Param("countries") List<String> countries);
+
+    // Weekly dashboard – Cars Unlocked: per-country/per-car unlock count bucketed by ISO week (Monday)
+    // across the whole range in ONE query. Mirrors getCarUnlockStatsByDateRange's filter (active
+    // master car match for master-car countries, pass-through for others); only the date_trunc('week')
+    // grouping is added. Returns rows of [country, car_name, week_start(date), unlocked].
+    @Query(value = """
+        SELECT c.country, c.car_name,
+               date_trunc('week', c.creation_time)::date AS week_start,
+               COUNT(*) AS unlocked
+        FROM srl_car_unlocked c
+        LEFT JOIN srl_master_cars cs ON cs.car_name = c.car_name AND cs.country_code = c.country AND cs.is_active = 1
+        WHERE CAST(c.creation_time as date) >= :startDate AND CAST(c.creation_time as date) <= :endDate
+          AND c.is_deleted = 0
+          AND c.country IN (:countries)
+          AND ( (c.country IN (SELECT DISTINCT m.country_code FROM srl_master_cars m) AND cs.id IS NOT NULL)
+                OR c.country NOT IN (SELECT DISTINCT m2.country_code FROM srl_master_cars m2) )
+        GROUP BY c.country, c.car_name, date_trunc('week', c.creation_time)
+    """, nativeQuery = true)
+    List<Object[]> getWeeklyCarUnlocked(@Param("startDate") Date startDate, @Param("endDate") Date endDate, @Param("countries") List<String> countries);
 }

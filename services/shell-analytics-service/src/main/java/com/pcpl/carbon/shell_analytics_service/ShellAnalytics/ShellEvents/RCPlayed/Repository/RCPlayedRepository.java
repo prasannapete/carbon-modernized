@@ -159,4 +159,29 @@ public interface RCPlayedRepository extends PCPLCRUDRepository<RCPlayed> {
     List<Object[]> getCumulativeRCDurationBeforeDate(
             @Param("beforeDate") Date beforeDate
     );
+
+    // Weekly dashboard – RC Played: per-country/per-car played MINUTES (ROUND(sum(seconds)/60))
+    // bucketed by ISO week (Monday) across the whole range in ONE query. Same filters/definition as
+    // getRemoteControlPlayedStatsByDateRange; only the date_trunc('week') grouping is added. Returns
+    // rows of [country, car_name, week_start(date), total_minutes].
+    @Query(value = """
+        SELECT r.country, r.car_name,
+               date_trunc('week', r.creation_time)::date AS week_start,
+               ROUND(SUM(r.rc_duration)/60) AS total_minutes
+        FROM srl_rc_played r
+        WHERE r.is_deleted = 0
+          AND CAST(r.creation_time as date) >= :startDate
+          AND CAST(r.creation_time as date) >= (
+                SELECT CAST(MIN(cu.creation_time) as date) FROM srl_car_unlocked cu
+                WHERE cu.car_name IN (SELECT mc2.car_name FROM srl_master_cars mc2 WHERE mc2.country_code IN (:countries) AND mc2.is_active = 1 AND mc2.is_deleted = 0)
+                  AND cu.game_id = r.game_id AND cu.is_deleted = 0 AND cu.country IN (:countries))
+          AND CAST(r.creation_time as date) <= :endDate
+          AND r.country IN (:countries)
+          AND r.car_name IN (SELECT mc.car_name FROM srl_master_cars mc WHERE mc.country_code IN (:countries) AND mc.is_active = 1)
+          AND r.game_id IN (SELECT DISTINCT cu.game_id FROM srl_car_unlocked cu
+                            WHERE cu.car_name IN (SELECT mc2.car_name FROM srl_master_cars mc2 WHERE mc2.country_code IN (:countries) AND mc2.is_active = 1)
+                              AND cu.country IN (:countries))
+        GROUP BY r.country, r.car_name, date_trunc('week', r.creation_time)
+    """, nativeQuery = true)
+    List<Object[]> getWeeklyRcDuration(@Param("startDate") Date startDate, @Param("endDate") Date endDate, @Param("countries") List<String> countries);
 }

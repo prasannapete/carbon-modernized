@@ -21,4 +21,11 @@ public interface ShellEventsService {
 
     public ApplicationResponse exportMultiTabExcel(HttpServletResponse response, String startDate, String endDate, String country, String reportType) throws Exception;
 
+    // Single server-side weekly dashboard payload: computes every week's numbers (plus the all-time
+    // Cumulative) in one request using the SAME computeWeeks/gather logic as the Weekly Excel export,
+    // so the dashboard's Weekly View and the Excel are always identical. Replaces the old frontend
+    // behaviour of firing ~48 parallel per-week requests (which starved the DB pool on production and
+    // silently rendered the failed weeks as 0).
+    public ApplicationResponse getWeeklyDashboard(String startDate, String endDate, String country) throws Exception;
+
 }

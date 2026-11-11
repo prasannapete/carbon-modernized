@@ -18,7 +18,10 @@ spring:
       - optional:file:../../.env[.properties]
   datasource:
     hikari:
-      maximum-pool-size: 5
+      # Raised from 5 so the weekly dashboard endpoint can fetch several weeks concurrently
+      # (WEEKLY_FETCH_PARALLELISM worker threads, each using one connection) with headroom left
+      # for other requests. Keep this below the Postgres max_connections budget shared by all services.
+      maximum-pool-size: 10
       minimum-idle: 1
       idle-timeout: 30000
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true&useSSL=false

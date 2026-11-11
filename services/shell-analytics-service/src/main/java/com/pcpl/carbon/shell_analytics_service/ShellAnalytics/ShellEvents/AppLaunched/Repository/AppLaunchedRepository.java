@@ -126,5 +126,32 @@ GROUP BY al.country, country.country_name
         GROUP BY al.country
     """)
     List<Object[]> getCumulativeCountsBeforeDate(@Param("beforeDate") Date beforeDate);
+
+    // Weekly dashboard: per-country launches bucketed by ISO week (Monday) across the whole range in
+    // ONE query. Same filters/definition as getCountryWiseLaunchedSummary's "launches" (game_id tied
+    // to an active master car, counted only on/after that game's first such unlock); only the
+    // date_trunc('week', ...) grouping is added, so each week's value is identical to running the
+    // per-week query for that week. Returns rows of [country, week_start(date), launches].
+    @Query(value = """
+        SELECT al.country,
+               date_trunc('week', al.creation_time)::date AS week_start,
+               SUM(CASE WHEN CAST(al.creation_time as date) >= (
+                           SELECT CAST(MIN(cu.creation_time) as date)
+                           FROM srl_car_unlocked cu
+                           WHERE cu.car_name IN (SELECT mc2.car_name FROM srl_master_cars mc2
+                                                 WHERE mc2.country_code IN (:countries) AND mc2.is_active = 1 AND mc2.is_deleted = 0)
+                             AND cu.game_id = al.game_id AND cu.is_deleted = 0 AND cu.country IN (:countries))
+                        THEN 1 ELSE 0 END) AS launches
+        FROM srl_app_launched al
+        WHERE al.is_deleted = 0
+          AND al.game_id IN (SELECT DISTINCT cu.game_id FROM srl_car_unlocked cu
+                             WHERE cu.car_name IN (SELECT mc2.car_name FROM srl_master_cars mc2
+                                                   WHERE mc2.country_code IN (:countries) AND mc2.is_active = 1 AND mc2.is_deleted = 0)
+                               AND cu.is_deleted = 0 AND cu.country IN (:countries))
+          AND al.country IN (:countries)
+          AND CAST(al.creation_time as date) >= :startDate AND CAST(al.creation_time as date) <= :endDate
+        GROUP BY al.country, date_trunc('week', al.creation_time)
+    """, nativeQuery = true)
+    List<Object[]> getWeeklyLaunches(@Param("startDate") Date startDate, @Param("endDate") Date endDate, @Param("countries") List<String> countries);
 }
 
